@@ -1,0 +1,19 @@
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Expo local state
+.expo/
+.expo-shared/
+
+# Metro cache
+node_modules/.cache/
+
+# VS Code
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db

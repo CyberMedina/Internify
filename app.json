@@ -1,0 +1,23 @@
+{
+  "expo": {
+    "name": "app-pasantias",
+    "slug": "app-pasantias",
+    "scheme": "app-pasantias",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "plugins": [
+      "expo-font",
+      "expo-asset"
+    ],
+    "android": {
+      "package": "com.cybermedina.apppasantias"
+    }
+  }
+}
