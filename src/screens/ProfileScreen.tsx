@@ -6,6 +6,8 @@ import { useNavigation } from '@react-navigation/native';
 import { Feather } from '@expo/vector-icons';
 import ScreenContainer from '../components/ScreenContainer';
 import { useI18n } from '../i18n/i18n';
+import { currentUser, internshipLevels } from '../mock/user';
+import LevelAvatar from '../components/LevelAvatar';
 
 const Row: React.FC<{ label: string; icon: keyof typeof Feather.glyphMap; onPress?: () => void }> = ({ label, icon, onPress }) => {
   const { colors, spacing, typography } = useTheme();
@@ -53,6 +55,25 @@ export default function ProfileScreen() {
 
   const canNavigateBackRef = React.useRef<boolean | null>(null);
 
+  // Calcular estado de pasantía (misma lógica que HomeScreen)
+  const getInternshipStatus = (hours: number) => {
+    const currentLevel = internshipLevels.find(l => hours >= l.minHours && hours < l.maxHours) 
+      || internshipLevels[internshipLevels.length - 1];
+    
+    const range = currentLevel.maxHours - currentLevel.minHours;
+    const progress = Math.min(Math.max((hours - currentLevel.minHours) / range, 0), 1);
+
+    return {
+      stage: currentLevel.name,
+      color: currentLevel.color,
+      progress: progress,
+      badge: currentLevel.badge,
+      nextGoal: currentLevel.maxHours
+    };
+  };
+
+  const status = getInternshipStatus(currentUser.hours);
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.card }}>
       {/* Header with back and title */}
@@ -90,31 +111,39 @@ export default function ProfileScreen() {
             alignItems: 'center',
           }}
         >
-          {/* Avatar */}
-          <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: '#ffffff33', alignItems: 'center', justifyContent: 'center' }}>
-            <Text style={{ color: '#fff', fontWeight: '800' }}>M</Text>
+          {/* Avatar con Nivel */}
+          <View style={{ marginRight: spacing(1.5) }}>
+            <LevelAvatar 
+              progress={status.progress} 
+              size={56} 
+              color={status.color}
+              badgeContent={status.badge}
+              imageUri={currentUser.avatar || undefined}
+            />
           </View>
 
           {/* Name + link */}
-          <View style={{ marginLeft: spacing(1.5), flex: 1 }}>
-            <Text style={{ color: '#fff', fontWeight: '700' }}>Marion Torphy</Text>
-            <Text style={{ color: '#ffffffcc', marginTop: 2 }}>{t('profile.viewProfile')}</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: '#fff', fontWeight: '700', fontSize: typography.sizes.lg }}>{currentUser.name}</Text>
+            <Text style={{ color: '#E0E7FF', marginTop: 2, fontSize: typography.sizes.sm }}>{status.stage}</Text>
+            <TouchableOpacity style={{ marginTop: 4 }}>
+              <Text style={{ color: '#fff', fontWeight: '600', fontSize: typography.sizes.sm }}>{t('profile.viewProfile')} ›</Text>
+            </TouchableOpacity>
           </View>
 
-          {/* Progress ring mock */}
+          {/* Porcentaje numérico */}
           <View
             style={{
-              width: 42,
-              height: 42,
-              borderRadius: 21,
-              backgroundColor: '#ffffff22',
-              borderWidth: 3,
-              borderColor: '#FFD84D',
-              alignItems: 'center',
+              alignItems: 'flex-end',
               justifyContent: 'center',
             }}
           >
-            <Text style={{ color: '#fff', fontSize: typography.sizes.xs, fontWeight: '700' }}>70%</Text>
+            <Text style={{ color: status.color, fontSize: typography.sizes.xl, fontWeight: '800' }}>
+              {Math.round(status.progress * 100)}%
+            </Text>
+            <Text style={{ color: '#ffffffaa', fontSize: typography.sizes.xs }}>
+              {currentUser.hours} / {status.nextGoal}h
+            </Text>
           </View>
         </View>
 

@@ -6,7 +6,9 @@ import { Feather } from '@expo/vector-icons';
 import JobCardLarge from '../components/JobCardLarge';
 import JobCardSmall from '../components/JobCardSmall';
 import Chip from '../components/Chip';
+import LevelAvatar from '../components/LevelAvatar';
 import { recentJobs, suggestedJobs, categories } from '../mock/jobs';
+import { currentUser, internshipLevels } from '../mock/user';
 import ScreenContainer from '../components/ScreenContainer';
 import HomeSkeleton from './HomeSkeleton';
 import { useI18n } from '../i18n/i18n';
@@ -18,7 +20,27 @@ export default function HomeScreen() {
   const [loading, setLoading] = React.useState(true);
   const [refreshing, setRefreshing] = React.useState(false);
   const [activeCat, setActiveCat] = React.useState('Todos');
-  const userName = 'Jhonatan Medina';
+  
+  const getInternshipStatus = (hours: number) => {
+    // Encontrar el nivel actual basado en las horas
+    const currentLevel = internshipLevels.find(l => hours >= l.minHours && hours < l.maxHours) 
+      || internshipLevels[internshipLevels.length - 1];
+    
+    // Calcular progreso dentro del nivel actual
+    const range = currentLevel.maxHours - currentLevel.minHours;
+    const progress = Math.min(Math.max((hours - currentLevel.minHours) / range, 0), 1);
+
+    return {
+      stage: currentLevel.name,
+      color: currentLevel.color,
+      progress: progress,
+      badge: currentLevel.badge,
+      nextGoal: currentLevel.maxHours
+    };
+  };
+
+  const status = getInternshipStatus(currentUser.hours);
+
   const hour = new Date().getHours();
   const saludo = hour < 12 ? t('home.goodMorning') : hour < 19 ? t('home.goodAfternoon') : t('home.goodEvening');
   const filteredRecent = React.useMemo(() => {
@@ -58,12 +80,15 @@ export default function HomeScreen() {
           {/* Izquierda: avatar + textos */}
           <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
             <TouchableOpacity onPress={() => navigation.navigate('ProfileMain')} activeOpacity={0.8}>
-              <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' }}>
-                <Feather name="user" size={18} color="#fff" />
-              </View>
+              <LevelAvatar 
+                progress={status.progress} 
+                size={48} 
+                color={status.color}
+                badgeContent={status.badge}
+              />
             </TouchableOpacity>
-            <View style={{ marginLeft: spacing(1) }}>
-              <Text style={{ color: '#E0E7FF' }}>{t('home.hello', { name: userName })}</Text>
+            <View style={{ marginLeft: spacing(1.5) }}>
+              <Text style={{ color: '#E0E7FF' }}>{t('home.hello', { name: currentUser.name })}</Text>
               <Text style={{ color: '#fff', fontWeight: '800', fontSize: typography.sizes.xl }}>{saludo}</Text>
             </View>
           </View>
