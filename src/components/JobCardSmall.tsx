@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
+import { View, Text, TouchableOpacity, Image } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
 import Chip from './Chip';
 import AvatarGroup from './AvatarGroup';
@@ -8,6 +8,7 @@ import { Job } from './JobCardLarge';
 import { useNavigation } from '@react-navigation/native';
 import { useSaved } from '../context/SavedContext';
 import { useI18n } from '../i18n/i18n';
+import { getInitials } from '../utils/stringUtils';
 
 export default function JobCardSmall({ job, applicantsLabel, bookmarked, onToggleBookmark }: { job: Job; applicantsLabel?: string; bookmarked?: boolean; onToggleBookmark?: () => void }) {
   const { colors, spacing, radius, typography } = useTheme();
@@ -25,8 +26,12 @@ export default function JobCardSmall({ job, applicantsLabel, bookmarked, onToggl
     >
       <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
         <View style={{ flexDirection: 'row' }}>
-          <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: colors.chipBg, alignItems: 'center', justifyContent: 'center', marginRight: spacing(1) }}>
-            <Text style={{ fontWeight: '800', color: colors.primary }}>A</Text>
+          <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: colors.chipBg, alignItems: 'center', justifyContent: 'center', marginRight: spacing(1), overflow: 'hidden' }}>
+            {job.companyLogo ? (
+              <Image source={{ uri: job.companyLogo }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+            ) : (
+              <Text style={{ fontWeight: '800', color: colors.primary }}>{getInitials(job.company)}</Text>
+            )}
           </View>
           <View>
             <Text style={{ fontWeight: '700', color: colors.text }}>{job.title}</Text>
@@ -43,6 +48,11 @@ export default function JobCardSmall({ job, applicantsLabel, bookmarked, onToggl
         </TouchableOpacity>
       </View>
 
+      <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: spacing(0.5) }}>
+        <Feather name="map-pin" size={12} color={colors.textSecondary} />
+        <Text style={{ color: colors.textSecondary, marginLeft: 4, fontSize: typography.sizes.xs }}>{job.location}</Text>
+      </View>
+
       <View style={{ flexDirection: 'row', marginTop: spacing(1), alignItems: 'center' }}>
         {job.tags.slice(0, 2).map((t) => (
           <Chip key={t} label={t} />
@@ -56,25 +66,25 @@ export default function JobCardSmall({ job, applicantsLabel, bookmarked, onToggl
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <AvatarGroup avatars={job.avatars} />
           <Text style={{ textAlign: 'right' }}>
-            {
-              (() => {
-                const parts = job.salary.split(' /');
-                if (parts.length > 1) {
-                  const amount = parts[0];
-                  const suffix = ' /' + parts.slice(1).join(' /');
-                  return (
-                    <>
-                      <Text style={{ color: colors.primary, fontWeight: '700', fontSize: typography.sizes.md, letterSpacing: 0.2 }}>{amount}</Text>
-                      <Text style={{ color: colors.textSecondary, fontSize: typography.sizes.sm }}>{suffix}</Text>
-                    </>
-                  );
-                }
-                return <Text style={{ color: colors.primary, fontWeight: '700', fontSize: typography.sizes.md }}>{job.salary}</Text>;
-              })()
-            }
+            {job.salary === 'Anónimo' ? (
+              <Text style={{ color: colors.textSecondary, fontWeight: '700', fontSize: typography.sizes.md }}>Anónimo</Text>
+            ) : (
+              <>
+                <Text style={{ color: colors.primary, fontWeight: '700', fontSize: typography.sizes.md, letterSpacing: 0.2 }}>{job.salary.replace(' /mes', '')}</Text>
+                <Text style={{ color: colors.textSecondary, fontSize: typography.sizes.sm }}> / mes</Text>
+              </>
+            )}
           </Text>
         </View>
-  <Text style={{ color: colors.textSecondary, fontSize: typography.sizes.xs, marginTop: spacing(0.5) }}>{job.applicants} {applicantsText}</Text>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: spacing(0.5) }}>
+          <Text style={{ color: colors.textSecondary, fontSize: typography.sizes.xs }}>{job.applicants} {applicantsText}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Feather name="clock" size={12} color={colors.textSecondary} style={{ marginRight: 4 }} />
+            <Text style={{ color: colors.textSecondary, fontSize: typography.sizes.xs }}>
+              {job.postedTime || 'Reciente'}
+            </Text>
+          </View>
+        </View>
       </View>
     </TouchableOpacity>
   );

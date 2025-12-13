@@ -1,32 +1,205 @@
-import React from 'react';
-import { View, Text, ScrollView, TextInput, TouchableOpacity } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { View, Text, ScrollView, TextInput, TouchableOpacity, FlatList, ActivityIndicator } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../theme/ThemeContext';
 import { Feather } from '@expo/vector-icons';
-import JobCardLarge from '../components/JobCardLarge';
+import JobCardLarge, { Job } from '../components/JobCardLarge';
 import JobCardSmall from '../components/JobCardSmall';
 import Chip from '../components/Chip';
 import LevelAvatar from '../components/LevelAvatar';
-import { recentJobs, suggestedJobs, categories } from '../mock/jobs';
-import { currentUser, internshipLevels } from '../mock/user';
+import { internshipLevels } from '../mock/user';
 import ScreenContainer from '../components/ScreenContainer';
 import HomeSkeleton from './HomeSkeleton';
+import SkeletonJobCardLarge from '../components/skeletons/SkeletonJobCardLarge';
+import SkeletonJobCardSmall from '../components/skeletons/SkeletonJobCardSmall';
+import SkeletonChip from '../components/skeletons/SkeletonChip';
 import { useI18n } from '../i18n/i18n';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useAuth } from '../context/AuthContext';
+import { getSuggestedVacancies, getCategories, getRecentVacancies } from '../services/vacancyService';
+import { Vacancy, Category } from '../types/vacancy';
+
+const mapVacancyToJob = (v: Vacancy): Job => ({
+  id: v.id.toString(),
+  title: v.title,
+  company: v.company.name,
+  location: v.location || 'N/A',
+  tags: v.tags && v.tags.length > 0 ? v.tags : (v.requirements && v.requirements.length > 0 ? v.requirements : (v.academic_programs || [])),
+  applicants: v.applicants_count ?? 0,
+  salary: v.salary_range ? `C$${v.salary_range}` : 'Anónimo',
+  avatars: [],
+  companyLogo: v.company.logo || v.company.photo,
+  postedTime: v.dates?.posted_human
+});
 
 export default function HomeScreen() {
   const { colors, spacing, typography, toggleScheme } = useTheme();
   const { t } = useI18n();
+  const { studentProfile, fetchStudentProfile, userToken } = useAuth();
   const navigation = useNavigation<any>();
-  const [loading, setLoading] = React.useState(true);
-  const [refreshing, setRefreshing] = React.useState(false);
-  const [activeCat, setActiveCat] = React.useState('Todos');
+  const insets = useSafeAreaInsets();
   
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  
+  // Data states
+  const [suggested, setSuggested] = useState<Job[]>([]);
+  const [categoriesList, setCategoriesList] = useState<Category[]>([]);
+  const [recent, setRecent] = useState<Job[]>([]);
+  
+  // Filter & Pagination states
+  const [activeCatId, setActiveCatId] = useState<number | null>(null);
+  const [searchText, setSearchText] = useState('');
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [autoSelected, setAutoSelected] = useState(false);
+
+  // Debounce search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setPage(1);
+      fetchRecent(1, searchText, activeCatId);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchText]);
+
+  // Initial load
+  useEffect(() => {
+    loadInitialData();
+  }, []);
+
+  const loadInitialData = async () => {
+    if (!userToken) return;
+    setLoading(true);
+    
+    try {
+      const promises = [
+        fetchStudentProfile(),
+        fetchSuggested(),
+        fetchCategories()
+      ];
+      
+      if (searchText === '') {
+        promises.push(fetchRecent(1, '', activeCatId));
+      }
+      
+      await Promise.all(promises);
+    } catch (error) {
+      console.error('Error loading initial data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchSuggested = async () => {
+    if (!userToken) return;
+    try {
+      const res = await getSuggestedVacancies(userToken);
+      setSuggested(res.data.map(mapVacancyToJob));
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const fetchCategories = async () => {
+    if (!userToken) return;
+    try {
+      const res = await getCategories(userToken);
+      setCategoriesList(res.data);
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const fetchRecent = async (pageNum: number, search: string, catId: number | null) => {
+    if (!userToken) return;
+    if (pageNum === 1) {
+      setLoadingMore(false);
+    }
+    
+    try {
+      const res = await getRecentVacancies(userToken, pageNum, 10, search, catId || undefined);
+      
+      // DEBUG LOGS
+      if (res.data && res.data.length > 0) {
+        console.log('API Response Sample (dates):', JSON.stringify(res.data[0].dates, null, 2));
+      }
+
+      const newJobs = res.data.map(mapVacancyToJob);
+
+      if (newJobs.length > 0) {
+        console.log('Mapped Job Sample (postedTime):', newJobs[0].postedTime);
+      }
+      
+      if (pageNum === 1) {
+        setRecent(newJobs);
+      } else {
+        setRecent(prev => [...prev, ...newJobs]);
+      }
+      
+      setHasMore(!!res.next_page_url);
+    } catch (error) {
+      console.error(error);
+      setHasMore(false);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  // Auto-select category based on career
+  useEffect(() => {
+    if (!autoSelected && studentProfile?.academic_info?.career && categoriesList.length > 0) {
+      const careerName = studentProfile.academic_info.career;
+      // Normalize removing accents and special characters
+      const normalize = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+      
+      console.log('Auto-select Debug:');
+      console.log('Student Career:', careerName);
+      console.log('Categories:', categoriesList.map(c => `${c.name} (${c.pseudonym})`).join(', '));
+
+      const matchedCategory = categoriesList.find(c => 
+        normalize(c.name) === normalize(careerName) || 
+        (c.pseudonym && normalize(c.pseudonym) === normalize(careerName))
+      );
+
+      if (matchedCategory) {
+        console.log(`Auto-selecting category: ${matchedCategory.name}`);
+        setActiveCatId(matchedCategory.id);
+        setPage(1);
+        fetchRecent(1, searchText, matchedCategory.id);
+      } else {
+        console.log('No matching category found for career:', careerName);
+      }
+      setAutoSelected(true);
+    }
+  }, [studentProfile, categoriesList, autoSelected]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    setPage(1);
+    await loadInitialData();
+    setRefreshing(false);
+  }, [userToken, activeCatId, searchText]);
+
+  const handleCategoryPress = (catId: number | null) => {
+    if (activeCatId === catId) return;
+    setActiveCatId(catId);
+    setPage(1);
+    fetchRecent(1, searchText, catId);
+  };
+
+  const handleLoadMore = () => {
+    if (!hasMore || loadingMore) return;
+    setLoadingMore(true);
+    const nextPage = page + 1;
+    setPage(nextPage);
+    fetchRecent(nextPage, searchText, activeCatId);
+  };
+
   const getInternshipStatus = (hours: number) => {
-    // Encontrar el nivel actual basado en las horas
     const currentLevel = internshipLevels.find(l => hours >= l.minHours && hours < l.maxHours) 
       || internshipLevels[internshipLevels.length - 1];
-    
-    // Calcular progreso dentro del nivel actual
     const range = currentLevel.maxHours - currentLevel.minHours;
     const progress = Math.min(Math.max((hours - currentLevel.minHours) / range, 0), 1);
 
@@ -39,45 +212,144 @@ export default function HomeScreen() {
     };
   };
 
-  const status = getInternshipStatus(currentUser.hours);
+  const currentHours = 0; 
+  const status = getInternshipStatus(currentHours);
+  
+  const displayName = studentProfile?.profile 
+    ? `${studentProfile.profile.first_name.split(' ')[0]} ${studentProfile.profile.last_name.split(' ')[0]}`
+    : 'Estudiante';
 
   const hour = new Date().getHours();
   const saludo = hour < 12 ? t('home.goodMorning') : hour < 19 ? t('home.goodAfternoon') : t('home.goodEvening');
-  const filteredRecent = React.useMemo(() => {
-    if (activeCat === 'Todos') return recentJobs;
-    const q = activeCat.toLowerCase();
-    return recentJobs.filter(j =>
-      j.title.toLowerCase().includes(q) ||
-      j.company.toLowerCase().includes(q) ||
-      j.tags.some(t => t.toLowerCase().includes(q))
-    );
-  }, [activeCat]);
-
-  React.useEffect(() => {
-    const timer = setTimeout(() => setLoading(false), 2000);
-    return () => clearTimeout(timer);
-  }, []);
-
-  const onRefresh = React.useCallback(() => {
-    setRefreshing(true);
-    setLoading(true);
-    const timer = setTimeout(() => {
-      setLoading(false);
-      setRefreshing(false);
-    }, 2000);
-    return () => clearTimeout(timer);
-  }, []);
 
   if (loading) {
     return <HomeSkeleton />;
   }
 
+  const renderHeader = () => (
+    <View>
+      {/* Widget de Progreso del Perfil */}
+      {studentProfile && !studentProfile.has_cv && (
+        <View style={{ 
+          marginHorizontal: spacing(2), 
+          marginTop: spacing(2), 
+          padding: spacing(2.5), 
+          backgroundColor: colors.surface, 
+          borderRadius: 20, 
+          borderWidth: 1, 
+          borderColor: colors.border, 
+          shadowColor: colors.primary, 
+          shadowOffset: { width: 0, height: 8 }, 
+          shadowOpacity: 0.1, 
+          shadowRadius: 16, 
+          elevation: 3 
+        }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: spacing(2) }}>
+            <View style={{ flex: 1, paddingRight: spacing(1) }}>
+              <Text style={{ fontSize: typography.sizes.lg, fontWeight: '800', color: colors.text, marginBottom: 4 }}>
+                ¡Impulsa tu carrera! 🚀
+              </Text>
+              <Text style={{ color: colors.textSecondary, fontSize: typography.sizes.sm, lineHeight: 20 }}>
+                Sube tu CV para <Text style={{ fontWeight: '700', color: colors.primary }}>activar tu visibilidad</Text> ante las empresas.
+              </Text>
+            </View>
+            <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: colors.chipBg, alignItems: 'center', justifyContent: 'center' }}>
+              <Feather name="briefcase" size={22} color={colors.primary} />
+            </View>
+          </View>
+
+          <View style={{ marginBottom: spacing(2.5) }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+              <Text style={{ fontSize: 12, fontWeight: '600', color: colors.textSecondary }}>Perfil completado</Text>
+              <Text style={{ fontSize: 12, fontWeight: '800', color: colors.primary }}>60%</Text>
+            </View>
+            <View style={{ height: 8, backgroundColor: colors.border, borderRadius: 4, overflow: 'hidden' }}>
+              <View style={{ width: '60%', height: '100%', backgroundColor: colors.primary, borderRadius: 4 }} />
+            </View>
+          </View>
+
+          <TouchableOpacity 
+            onPress={() => navigation.navigate('Onboarding', { screen: 'CVStart' })}
+            activeOpacity={0.9}
+            style={{ 
+              backgroundColor: colors.primary, 
+              paddingVertical: spacing(1.5), 
+              borderRadius: 14, 
+              alignItems: 'center',
+              shadowColor: colors.primary,
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.3,
+              elevation: 4
+            }}
+          >
+            <Text style={{ color: '#FFF', fontWeight: '700', fontSize: typography.sizes.md }}>
+              Finalizar mi perfil ahora
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Suggested */}
+      {suggested.length > 0 && (
+        <View style={{ paddingHorizontal: spacing(2), marginTop: spacing(2) }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Text style={{ fontSize: typography.sizes.lg, fontWeight: '700', color: colors.text }}>{t('home.suggested')}</Text>
+            <TouchableOpacity>
+              <Text style={{ color: colors.primary, fontWeight: '600' }}>{t('common.viewAll')}</Text>
+            </TouchableOpacity>
+          </View>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={{ marginTop: spacing(1.5), overflow: 'visible' }}
+            contentContainerStyle={{ paddingRight: spacing(2), paddingLeft: spacing(0.5), paddingBottom: spacing(1.5) }}
+          >
+            {suggested.map((job, idx) => (
+              <View key={job.id} style={{ marginLeft: idx === 0 ? 0 : 0 }}>
+                <JobCardLarge job={job} />
+              </View>
+            ))}
+          </ScrollView>
+        </View>
+      )}
+
+      {/* Recent Header & Categories */}
+      <View style={{ paddingHorizontal: spacing(2), marginTop: spacing(1.5) }}>
+        <Text style={{ fontSize: typography.sizes.lg, fontWeight: '700', color: colors.text, marginBottom: spacing(1) }}>{t('home.recent')}</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} nestedScrollEnabled contentContainerStyle={{ paddingVertical: spacing(0.5) }}>
+          <Chip 
+            key="all" 
+            label="Todos" 
+            active={activeCatId === null} 
+            onPress={() => handleCategoryPress(null)} 
+          />
+          {categoriesList.map((c) => (
+            <Chip 
+              key={c.id} 
+              label={c.pseudonym || c.name} 
+              active={activeCatId === c.id} 
+              onPress={() => handleCategoryPress(c.id)} 
+            />
+          ))}
+        </ScrollView>
+      </View>
+    </View>
+  );
+
   return (
-  <ScreenContainer scroll refreshing={refreshing} onRefresh={onRefresh}>
-      {/* Header con saludo y acciones */}
-      <View style={{ backgroundColor: colors.primary, paddingTop: spacing(5), paddingHorizontal: spacing(2), paddingBottom: spacing(2), borderBottomLeftRadius: 24, borderBottomRightRadius: 24 }}>
+    <View style={{ flex: 1, backgroundColor: colors.card }}>
+      {/* Header con saludo y acciones - Sticky */}
+      <View style={{ 
+        backgroundColor: colors.primary, 
+        paddingTop: insets.top + spacing(2), 
+        paddingHorizontal: spacing(2), 
+        paddingBottom: spacing(2), 
+        borderBottomLeftRadius: 24, 
+        borderBottomRightRadius: 24,
+        zIndex: 10,
+        elevation: 4
+      }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-          {/* Izquierda: avatar + textos */}
           <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
             <TouchableOpacity onPress={() => navigation.navigate('ProfileMain')} activeOpacity={0.8}>
               <LevelAvatar 
@@ -85,14 +357,14 @@ export default function HomeScreen() {
                 size={48} 
                 color={status.color}
                 badgeContent={status.badge}
+                imageUri={studentProfile?.profile?.photo || undefined}
               />
             </TouchableOpacity>
             <View style={{ marginLeft: spacing(1.5) }}>
-              <Text style={{ color: '#E0E7FF' }}>{t('home.hello', { name: currentUser.name })}</Text>
+              <Text style={{ color: '#E0E7FF' }}>{t('home.hello', { name: displayName })}</Text>
               <Text style={{ color: '#fff', fontWeight: '800', fontSize: typography.sizes.xl }}>{saludo}</Text>
             </View>
           </View>
-          {/* Derecha: acción simple (mantengo bell como toggler de tema) */}
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <TouchableOpacity onPress={toggleScheme} style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' }}>
               <Feather name="bell" size={18} color="#fff" />
@@ -104,7 +376,13 @@ export default function HomeScreen() {
         <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: spacing(2) }}>
           <View style={{ flex: 1, backgroundColor: colors.surface, borderRadius: 16, flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing(1.5), height: 44 }}>
             <Feather name="search" size={18} color={colors.textSecondary} />
-            <TextInput placeholder={t('common.searchPlaceholder')} placeholderTextColor={colors.textSecondary} style={{ marginLeft: 8, flex: 1, color: colors.text }} />
+            <TextInput 
+              placeholder={t('common.searchPlaceholder')} 
+              placeholderTextColor={colors.textSecondary} 
+              style={{ marginLeft: 8, flex: 1, color: colors.text }}
+              value={searchText}
+              onChangeText={setSearchText}
+            />
           </View>
           <TouchableOpacity style={{ marginLeft: spacing(1), backgroundColor: '#FFD166', width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' }}>
             <Feather name="sliders" size={18} color={colors.text} />
@@ -112,45 +390,34 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      {/* Suggested */}
-      <View style={{ paddingHorizontal: spacing(2), marginTop: spacing(2) }}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Text style={{ fontSize: typography.sizes.lg, fontWeight: '700', color: colors.text }}>{t('home.suggested')}</Text>
-          <TouchableOpacity>
-            <Text style={{ color: colors.primary, fontWeight: '600' }}>{t('common.viewAll')}</Text>
-          </TouchableOpacity>
-        </View>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={{ marginTop: spacing(1.5), overflow: 'visible' }}
-          contentContainerStyle={{ paddingRight: spacing(2), paddingLeft: spacing(0.5), paddingBottom: spacing(1.5) }}
-        >
-          {suggestedJobs.map((job, idx) => (
-            <View key={job.id} style={{ marginLeft: idx === 0 ? 0 : 0 }}>
-              <JobCardLarge job={job} />
+      <ScreenContainer scroll={false} style={{ paddingTop: 0 }}>
+        <FlatList
+          data={recent}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => (
+            <View style={{ paddingHorizontal: spacing(2) }}>
+              <JobCardSmall job={item} />
             </View>
-          ))}
-        </ScrollView>
-      </View>
-
-      {/* Recent */}
-      <View style={{ paddingHorizontal: spacing(2), marginTop: spacing(1.5) }}>
-  <Text style={{ fontSize: typography.sizes.lg, fontWeight: '700', color: colors.text, marginBottom: spacing(1) }}>{t('home.recent')}</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} nestedScrollEnabled contentContainerStyle={{ paddingVertical: spacing(0.5) }}>
-          {categories.map((c) => (
-            <Chip key={c} label={c} active={activeCat === c} onPress={() => setActiveCat(c)} />
-          ))}
-        </ScrollView>
-
-        <View style={{ marginTop: spacing(1.5), paddingBottom: spacing(1) }}>
-          {filteredRecent.length > 0 ? (
-            filteredRecent.map((job) => <JobCardSmall key={job.id} job={job} />)
-          ) : (
-            <Text style={{ color: colors.textSecondary, paddingVertical: spacing(2) }}>{t('common.noJobsFor', { cat: activeCat })}</Text>
           )}
-        </View>
-      </View>
-  </ScreenContainer>
+          ListHeaderComponent={renderHeader}
+          ListEmptyComponent={
+            !loading && !refreshing && (
+              <View style={{ padding: spacing(4), alignItems: 'center', justifyContent: 'center', marginTop: spacing(2) }}>
+                <Feather name="inbox" size={48} color={colors.textSecondary} style={{ marginBottom: spacing(2), opacity: 0.5 }} />
+                <Text style={{ color: colors.textSecondary, textAlign: 'center', fontSize: typography.sizes.md }}>
+                  {t('common.noJobsAvailable')}
+                </Text>
+              </View>
+            )
+          }
+          onEndReached={handleLoadMore}
+          onEndReachedThreshold={0.5}
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          ListFooterComponent={loadingMore ? <ActivityIndicator style={{ marginVertical: 20 }} color={colors.primary} /> : <View style={{ height: 20 }} />}
+          contentContainerStyle={{ paddingBottom: spacing(2) }}
+        />
+      </ScreenContainer>
+    </View>
   );
 }

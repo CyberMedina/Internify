@@ -1,57 +1,71 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, FlatList } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, TouchableOpacity, FlatList, ActivityIndicator, RefreshControl, Image } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Chip from '../components/Chip';
 import { useNavigation } from '@react-navigation/native';
 import { useI18n } from '../i18n/i18n';
-
-type Status = 'Enviada' | 'Aceptada' | 'Rechazada' | 'Pendiente';
-
-type Application = {
-  id: string;
-  title: string;
-  company: string;
-  location: string;
-  tags: string[];
-  status: Status;
-  logoLetter: string;
-  logoBg: string;
-};
-
-const DATA: Application[] = [
-  { id: '1', title: 'Desarrollador React', company: 'AmplifyAvenue', location: 'Nueva York, USA', tags: ['Tiempo completo', 'Remoto', 'Pasantía'], status: 'Enviada', logoLetter: 'A', logoBg: '#FFE89A' },
-  { id: '2', title: 'Diseñador Gráfico', company: 'PixelPulse Tech', location: 'Nueva York, USA', tags: ['Medio tiempo', 'Remoto', 'Nivel inicial'], status: 'Aceptada', logoLetter: 'P', logoBg: '#1C1C1C' },
-  { id: '3', title: 'Diseñador UI', company: 'VelocityCraft', location: 'Nueva York, USA', tags: ['Medio tiempo', 'Remoto', 'Nivel inicial'], status: 'Rechazada', logoLetter: 'V', logoBg: '#FFE2A8' },
-  { id: '4', title: 'Contador', company: 'QubitLink Software', location: 'Nueva York, USA', tags: ['Contrato', 'Presencial', 'Asociado'], status: 'Pendiente', logoLetter: 'Q', logoBg: '#111111' },
-  { id: '5', title: 'Diseñador UX', company: 'TitanTech Labs', location: 'Nueva York, USA', tags: ['Tiempo completo', 'Remoto', 'Pasantía'], status: 'Aceptada', logoLetter: 'T', logoBg: '#2B50FF' },
-];
-
-function statusColors(status: Status) {
-  switch (status) {
-    case 'Aceptada':
-      return { bg: '#E7F7EF', text: '#1E8E5A' };
-    case 'Rechazada':
-      return { bg: '#FDEBED', text: '#E23E57' };
-    case 'Pendiente':
-      return { bg: '#FFF6E5', text: '#D99000' };
-    case 'Enviada':
-    default:
-      return { bg: '#E8EDFF', text: '#3C5BFF' };
-  }
-}
+import { Application, ApplicationStatus } from '../types/vacancy';
+import { getMyApplications } from '../services/vacancyService';
+import { useAuth } from '../context/AuthContext';
+import ScreenContainer from '../components/ScreenContainer';
+import { formatDate } from '../utils/stringUtils';
 
 export default function MyApplicationsScreen() {
   const { colors, spacing, radius, typography } = useTheme();
   const insets = useSafeAreaInsets();
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>();
   const { t } = useI18n();
+  const { userToken } = useAuth();
+  
+  const [applications, setApplications] = useState<Application[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const fetchApplications = async () => {
+    try {
+      if (userToken) {
+        const data = await getMyApplications(userToken);
+        setApplications(data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch applications', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchApplications();
+  }, [userToken]);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchApplications();
+  };
+
+  const getStatusConfig = (status: ApplicationStatus) => {
+    switch (status) {
+      case 'accepted':
+        return { bg: '#E7F7EF', text: '#1E8E5A', label: 'Aceptada' };
+      case 'rejected':
+        return { bg: '#FDEBED', text: '#E23E57', label: 'Rechazada' };
+      case 'reviewed':
+        return { bg: '#E8EDFF', text: '#3C5BFF', label: 'CV Visto' };
+      case 'pending':
+      default:
+        return { bg: '#FFF6E5', text: '#D99000', label: 'Pendiente' };
+    }
+  };
 
   const renderItem = ({ item }: { item: Application }) => {
-    const s = statusColors(item.status);
+    const s = getStatusConfig(item.status);
+    const logoLetter = item.vacancy.company.name.charAt(0).toUpperCase();
+    
     return (
-      <View
+      <TouchableOpacity
+        onPress={() => navigation.navigate('ApplicationStatus', { application: item })}
         style={{
           backgroundColor: colors.surface,
           borderRadius: radius.lg,
@@ -74,62 +88,100 @@ export default function MyApplicationsScreen() {
                 width: 44,
                 height: 44,
                 borderRadius: 12,
-                backgroundColor: item.logoBg,
+                backgroundColor: colors.primary, // Using primary color for now, or could be random
                 alignItems: 'center',
                 justifyContent: 'center',
                 marginRight: spacing(1),
+                overflow: 'hidden',
               }}
             >
-              <Text style={{ color: '#fff', fontWeight: '800', fontSize: 20 }}>{item.logoLetter}</Text>
+               {item.vacancy.company.logo ? (
+                <Image 
+                  source={{ uri: item.vacancy.company.logo }} 
+                  style={{ width: '100%', height: '100%' }} 
+                  resizeMode="cover"
+                />
+              ) : (
+                <Text style={{ color: '#fff', fontWeight: '800', fontSize: 20 }}>{logoLetter}</Text>
+              )}
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={{ color: colors.text, fontWeight: '700' }}>{item.title}</Text>
-              <Text style={{ color: colors.textSecondary, marginTop: 2 }} numberOfLines={1}>{item.company}</Text>
+              <Text style={{ color: colors.text, fontWeight: '700' }}>{item.vacancy.title}</Text>
+              <Text style={{ color: colors.textSecondary, marginTop: 2 }} numberOfLines={1}>{item.vacancy.company.name}</Text>
             </View>
           </View>
           {/* Status badge */}
           <View style={{ paddingHorizontal: 10, height: 26, borderRadius: 14, backgroundColor: s.bg, alignItems: 'center', justifyContent: 'center' }}>
-            <Text style={{ color: s.text, fontWeight: '700', fontSize: typography.sizes.xs }}>{item.status}</Text>
+            <Text style={{ color: s.text, fontWeight: '700', fontSize: typography.sizes.xs }}>{s.label}</Text>
           </View>
         </View>
 
         {/* Location */}
         <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: spacing(1) }}>
           <Feather name="map-pin" size={14} color={colors.primary} />
-          <Text style={{ marginLeft: 6, color: colors.textSecondary }}>{item.location}</Text>
+          <Text style={{ marginLeft: 6, color: colors.textSecondary }}>{item.vacancy.location}</Text>
         </View>
-
-        {/* Chips row */}
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: spacing(1) }}>
-          {item.tags.map((t, idx) => (
-            <View key={idx} style={{ marginRight: spacing(1), marginBottom: spacing(0.5) }}>
-              <Chip label={t} size="xs" />
-            </View>
-          ))}
+        
+        {/* Date */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+          <Feather name="calendar" size={14} color={colors.textSecondary} />
+          <Text style={{ marginLeft: 6, color: colors.textSecondary, fontSize: 12 }}>
+            Aplicado el {formatDate(item.created_at)}
+          </Text>
         </View>
-      </View>
+      </TouchableOpacity>
     );
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.card }}>
+    <ScreenContainer safeTop>
       {/* Header */}
-      <View style={{ paddingTop: insets.top + spacing(1), paddingHorizontal: spacing(2), paddingBottom: spacing(1), flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-        <TouchableOpacity onPress={() => (navigation as any).goBack()} style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' }}>
+      <View style={{ 
+        height: 56,
+        paddingHorizontal: spacing(2), 
+        flexDirection: 'row', 
+        alignItems: 'center', 
+        justifyContent: 'space-between' 
+      }}>
+        <TouchableOpacity 
+          onPress={() => (navigation as any).goBack()} 
+          style={{ 
+            width: 40, 
+            height: 40, 
+            borderRadius: 20, 
+            backgroundColor: colors.surface, 
+            alignItems: 'center', 
+            justifyContent: 'center' 
+          }}
+        >
           <Feather name="arrow-left" size={18} color={colors.text} />
         </TouchableOpacity>
-  <Text style={{ color: colors.text, fontWeight: '700', fontSize: typography.sizes.lg }}>{t('applications.title')}</Text>
-        <TouchableOpacity style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' }}>
-          <Feather name="search" size={18} color={colors.text} />
-        </TouchableOpacity>
+        <Text style={{ color: colors.text, fontWeight: '700', fontSize: typography.sizes.lg }}>
+          {t('applications.title')}
+        </Text>
+        <View style={{ width: 40 }} /> 
       </View>
 
-      <FlatList
-        data={DATA}
-        keyExtractor={(it) => it.id}
-        renderItem={renderItem}
-        contentContainerStyle={{ paddingTop: spacing(1), paddingBottom: insets.bottom + spacing(2) }}
-      />
-    </View>
+      {loading ? (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      ) : (
+        <FlatList
+          data={applications}
+          renderItem={renderItem}
+          keyExtractor={(item) => item.id.toString()}
+          contentContainerStyle={{ paddingBottom: 20, paddingTop: 10 }}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+          ListEmptyComponent={
+            <View style={{ alignItems: 'center', marginTop: 50 }}>
+              <Text style={{ color: colors.textSecondary }}>No tienes postulaciones aún.</Text>
+            </View>
+          }
+        />
+      )}
+    </ScreenContainer>
   );
 }

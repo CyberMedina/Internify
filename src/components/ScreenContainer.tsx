@@ -1,13 +1,13 @@
 import React from 'react';
-import { View, ScrollView, ViewStyle, RefreshControl } from 'react-native';
+import { View, ScrollView, ViewStyle, RefreshControl, StyleProp } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../theme/ThemeContext';
 
 type Props = {
   children: React.ReactNode;
   scroll?: boolean;
-  style?: ViewStyle;
-  contentContainerStyle?: ViewStyle;
+  style?: StyleProp<ViewStyle>;
+  contentContainerStyle?: StyleProp<ViewStyle>;
   safeTop?: boolean;
   safeBottom?: boolean;
   refreshing?: boolean;
@@ -34,7 +34,7 @@ export default function ScreenContainer({
     return (
       <ScrollView
         style={[{ flex: 1, backgroundColor: colors.card, paddingTop }, style]}
-        contentContainerStyle={{ paddingBottom: spacing(4) + paddingBottom, ...(contentContainerStyle || {}) }}
+        contentContainerStyle={[{ paddingBottom: spacing(4) + paddingBottom }, contentContainerStyle]}
         keyboardShouldPersistTaps="handled"
         refreshControl={onRefresh ? (
           <RefreshControl

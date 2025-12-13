@@ -21,6 +21,7 @@ const es: Dict = {
     apply: 'Aplicar a este trabajo',
     goHome: 'Ir a inicio',
     noJobsFor: 'No se encontraron trabajos para "{{cat}}".',
+    noJobsAvailable: 'No hay vacantes disponibles por el momento.',
   },
   tabs: {
     home: 'Inicio',

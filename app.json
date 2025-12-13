@@ -4,6 +4,7 @@
     "slug": "app-pasantias",
     "scheme": "app-pasantias",
     "version": "1.0.0",
+    "userInterfaceStyle": "automatic",
     "orientation": "portrait",
     "splash": {
       "resizeMode": "contain",
@@ -14,10 +15,24 @@
     ],
     "plugins": [
       "expo-font",
-      "expo-asset"
+      "expo-asset",
+      [
+        "expo-notifications",
+        {
+          "icon": "./src/assets/images/uni-logo.png",
+          "color": "#ffffff"
+        }
+      ]
     ],
     "android": {
-      "package": "com.cybermedina.apppasantias"
-    }
+    "package": "com.uni.internify",
+    "googleServicesFile": "./google-services.json"
+  },
+    "extra": {
+      "eas": {
+        "projectId": "57f34094-4431-4bf8-a130-e6f3cf7666c6"
+      }
+    },
+    "owner": "cybermedina"
   }
 }

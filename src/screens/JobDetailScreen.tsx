@@ -1,13 +1,21 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, ActivityIndicator, Modal, StyleSheet, Image } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
-import { Feather } from '@expo/vector-icons';
+import { Feather, FontAwesome5 } from '@expo/vector-icons';
 import ScreenContainer from '../components/ScreenContainer';
 import Chip from '../components/Chip';
 import type { Job } from '../components/JobCardLarge';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useI18n } from '../i18n/i18n';
+import { currentUser } from '../mock/user';
+import { Alert } from 'react-native';
+import { getVacancyDetail, applyToVacancy, getMyApplications } from '../services/vacancyService';
+import { Vacancy, Application, ApplicationStatus } from '../types/vacancy';
+import { useAuth } from '../context/AuthContext';
+import JobDetailSkeleton from './JobDetailSkeleton';
+import { getInitials } from '../utils/stringUtils';
+import * as LocalAuthentication from 'expo-local-authentication';
 
 export default function JobDetailScreen() {
   const { colors, spacing, radius, typography } = useTheme();
@@ -16,19 +24,75 @@ export default function JobDetailScreen() {
   const job: Job = route.params?.job;
   const insets = useSafeAreaInsets();
   const { t } = useI18n();
-  const [tab, setTab] = React.useState<'about' | 'company' | 'review'>('about');
+  const { userToken, studentProfile } = useAuth();
+  const [tab, setTab] = React.useState<'about' | 'company'>('about');
   const [submitting, setSubmitting] = React.useState(false);
+  const [checkingStatus, setCheckingStatus] = React.useState(false);
+  const [showCVModal, setShowCVModal] = React.useState(false);
 
-  // Fallback mock if route param missing
-  const data: Job = job ?? {
-    id: 'detail',
-  title: 'Diseñador UI',
-    company: 'BrioSoft Solutions',
-  location: 'Nueva York, USA',
-    tags: ['Full-Time', 'Remote', 'Internship'],
-    applicants: 322,
-  salary: '$42k - $48k /mes',
-    avatars: [],
+  const [vacancy, setVacancy] = React.useState<Vacancy | null>(null);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    const fetchDetail = async () => {
+      if (!job?.id || !userToken) return;
+      try {
+        setLoading(true);
+        const id = parseInt(job.id, 10);
+        if (!isNaN(id)) {
+          const res = await getVacancyDetail(userToken, id);
+          setVacancy(res.data);
+        }
+      } catch (error) {
+        console.error(error);
+        Alert.alert('Error', 'No se pudo cargar el detalle');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchDetail();
+  }, [job?.id, userToken]);
+
+  if (loading && !vacancy) {
+    return <JobDetailSkeleton />;
+  }
+
+  const data = {
+    title: vacancy?.title ?? job?.title ?? 'Cargando...',
+    company: vacancy?.company?.name ?? job?.company ?? '',
+    location: vacancy?.location ?? job?.location ?? '',
+    salary: vacancy?.salary_range ? `C$${vacancy.salary_range}` : (job?.salary ?? ''),
+    modality: vacancy?.modality?.label ?? job?.tags?.[1] ?? 'N/A',
+    category: vacancy?.category?.name ?? vacancy?.categories?.[0] ?? job?.tags?.[0] ?? 'General',
+    level: vacancy?.areas?.[0] ?? job?.tags?.[2] ?? 'Pasantía',
+    description: vacancy?.description,
+    requirements: vacancy?.requirements ?? [],
+    applicants: vacancy?.applicants_count ?? job?.applicants ?? 0,
+    companyLogo: vacancy?.company?.logo ?? vacancy?.company?.photo ?? job?.companyLogo,
+    companyDescription: vacancy?.company?.description,
+    hasApplied: vacancy?.application?.has_applied ?? false,
+    applicationStatus: vacancy?.application?.status,
+    postedHuman: vacancy?.dates?.posted_human
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status?.toLowerCase()) {
+      case 'pending': return '#F59E0B'; // Amber
+      case 'accepted': return '#10B981'; // Green
+      case 'rejected': return '#EF4444'; // Red
+      case 'reviewed': return '#3B82F6'; // Blue
+      default: return colors.primary;
+    }
+  };
+
+  const getStatusLabel = (status: string) => {
+    switch (status?.toLowerCase()) {
+      case 'pending': return 'Pendiente';
+      case 'accepted': return 'Aceptada';
+      case 'rejected': return 'Rechazada';
+      case 'reviewed': return 'Revisado';
+      default: return status || 'Postulado';
+    }
   };
 
   return (
@@ -51,12 +115,16 @@ export default function JobDetailScreen() {
         </View>
       </View>
 
-  <ScreenContainer scroll contentContainerStyle={{ paddingTop: spacing(2), paddingBottom: spacing(10) }}>
+  <ScreenContainer scroll contentContainerStyle={{ paddingTop: spacing(2), paddingBottom: spacing(20) }}>
         {/* Header card-like */}
         <View style={{ backgroundColor: colors.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: spacing(2), paddingTop: spacing(4), paddingBottom: spacing(2) }}>
           <View style={{ alignItems: 'center' }}>
-            <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: colors.chipBg, alignItems: 'center', justifyContent: 'center' }}>
-              <Text style={{ color: colors.primary, fontWeight: '800', fontSize: 28 }}>B.</Text>
+            <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: colors.chipBg, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+              {data.companyLogo ? (
+                <Image source={{ uri: data.companyLogo }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+              ) : (
+                <Text style={{ color: colors.primary, fontWeight: '800', fontSize: 28 }}>{getInitials(data.company)}</Text>
+              )}
             </View>
             <Text style={{ marginTop: spacing(1), color: colors.text, fontWeight: '700', fontSize: typography.sizes.xl }}>{data.title}</Text>
             <Text style={{ marginTop: 4, color: colors.textSecondary }}>{data.company}</Text>
@@ -64,6 +132,12 @@ export default function JobDetailScreen() {
               <Feather name="map-pin" size={14} color={colors.primary} />
               <Text style={{ marginLeft: 6, color: colors.textSecondary }}>{data.location}</Text>
             </View>
+            {data.postedHuman && (
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+                <Feather name="clock" size={14} color={colors.textSecondary} />
+                <Text style={{ marginLeft: 6, color: colors.textSecondary, fontSize: 12 }}>{data.postedHuman}</Text>
+              </View>
+            )}
           </View>
 
           {/* Info tiles grid */}
@@ -77,8 +151,7 @@ export default function JobDetailScreen() {
                 <Text style={{ marginLeft: spacing(1), color: colors.textSecondary, fontSize: typography.sizes.xs }}>{t('detail.salaryMonthly')}</Text>
               </View>
               <Text style={{ marginTop: 6 }}>
-                <Text style={{ color: colors.primary, fontWeight: '700' }}>{data.salary.split(' /')[0]}</Text>
-                <Text style={{ color: colors.textSecondary }}> /mes</Text>
+                <Text style={{ color: colors.primary, fontWeight: '700' }}>{data.salary}</Text>
               </Text>
             </View>
 
@@ -91,7 +164,7 @@ export default function JobDetailScreen() {
                 <Text style={{ marginLeft: spacing(1), color: colors.textSecondary, fontSize: typography.sizes.xs }}>{t('detail.jobType')}</Text>
               </View>
               <View style={{ marginTop: 6 }}>
-                <Chip label={data.tags[0] ?? 'Full-Time'} size="xs" />
+                <Chip label={data.category} size="xs" />
               </View>
             </View>
 
@@ -104,7 +177,7 @@ export default function JobDetailScreen() {
                 <Text style={{ marginLeft: spacing(1), color: colors.textSecondary, fontSize: typography.sizes.xs }}>{t('detail.workingModel')}</Text>
               </View>
               <View style={{ marginTop: 6 }}>
-                <Chip label={data.tags[1] ?? 'Remote'} size="xs" />
+                <Chip label={data.modality} size="xs" />
               </View>
             </View>
 
@@ -117,7 +190,7 @@ export default function JobDetailScreen() {
                 <Text style={{ marginLeft: spacing(1), color: colors.textSecondary, fontSize: typography.sizes.xs }}>{t('detail.level')}</Text>
               </View>
               <View style={{ marginTop: 6 }}>
-                <Chip label={data.tags[2] ?? 'Internship'} size="xs" />
+                <Chip label={data.level} size="xs" />
               </View>
             </View>
           </View>
@@ -130,7 +203,6 @@ export default function JobDetailScreen() {
               [
                 { key: 'about', label: 'Acerca de' },
                 { key: 'company', label: 'Compañía' },
-                { key: 'review', label: 'Reseña' },
               ] as const
             ).map(({ key, label }) => (
               <TouchableOpacity key={key} onPress={() => setTab(key)} style={{ paddingVertical: spacing(1) }}>
@@ -148,14 +220,17 @@ export default function JobDetailScreen() {
             <View style={{ marginTop: spacing(2) }}>
               <Text style={{ color: colors.text, fontWeight: '700' }}>{t('detail.aboutThisJob')}</Text>
               <Text style={{ color: colors.textSecondary, marginTop: 6 }}>
-                Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua
-                <Text style={{ color: colors.primary }}>{t('detail.readMore')}</Text>
+                {data.description || 'Sin descripción disponible.'}
               </Text>
               <View style={{ marginTop: spacing(2) }}>
-                <Text style={{ color: colors.text, fontWeight: '700' }}>{t('detail.jobDescription')}</Text>
-                <Text style={{ color: colors.textSecondary, marginTop: 6 }}>• Lorem ipsum dolor sit amet, consectetur adipiscing elit.</Text>
-                <Text style={{ color: colors.textSecondary, marginTop: 6 }}>• Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.</Text>
-                <Text style={{ color: colors.textSecondary, marginTop: 6 }}>• Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris.</Text>
+                <Text style={{ color: colors.text, fontWeight: '700' }}>Requisitos</Text>
+                {data.requirements.length > 0 ? (
+                  data.requirements.map((req, index) => (
+                    <Text key={index} style={{ color: colors.textSecondary, marginTop: 6 }}>• {req}</Text>
+                  ))
+                ) : (
+                  <Text style={{ color: colors.textSecondary, marginTop: 6 }}>No especificado</Text>
+                )}
               </View>
             </View>
           )}
@@ -164,16 +239,7 @@ export default function JobDetailScreen() {
             <View style={{ marginTop: spacing(2) }}>
               <Text style={{ color: colors.text, fontWeight: '700' }}>{t('detail.company')}</Text>
               <Text style={{ color: colors.textSecondary, marginTop: 6 }}>
-                BrioSoft Solutions es una compañía enfocada en diseño y producto. Información mock para demo.
-              </Text>
-            </View>
-          )}
-
-          {tab === 'review' && (
-            <View style={{ marginTop: spacing(2) }}>
-              <Text style={{ color: colors.text, fontWeight: '700' }}>{t('detail.reviews')}</Text>
-              <Text style={{ color: colors.textSecondary, marginTop: 6 }}>
-                Aún no hay reseñas. Sé el primero en opinar.
+                {data.companyDescription || 'Sin información de la compañía.'}
               </Text>
             </View>
           )}
@@ -184,30 +250,152 @@ export default function JobDetailScreen() {
 
       {/* Fixed bottom CTA */}
       <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: spacing(2), paddingBottom: insets.bottom + spacing(1.5), paddingTop: spacing(1), backgroundColor: colors.surface, borderTopColor: colors.border, borderTopWidth: 1 }}>
+        {data.hasApplied ? (
           <TouchableOpacity
             activeOpacity={0.9}
-            onPress={() => {
+            onPress={async () => {
+              if (checkingStatus) return;
+              
+              if (vacancy?.application?.id) {
+                const app = {
+                  id: vacancy.application.id,
+                  status: vacancy.application.status,
+                  vacancy: vacancy
+                } as any;
+                (navigation as any).navigate('ApplicationStatus', { application: app });
+              } else {
+                try {
+                  setCheckingStatus(true);
+                  const apps = await getMyApplications(userToken);
+                  const match = apps.find(a => a.vacancy_id === vacancy?.id);
+                  
+                  if (match) {
+                    if (!match.vacancy) match.vacancy = vacancy as any;
+                    (navigation as any).navigate('ApplicationStatus', { application: match });
+                  } else {
+                    (navigation as any).navigate('MyApplications');
+                  }
+                } catch (e) {
+                  console.error(e);
+                  (navigation as any).navigate('MyApplications');
+                } finally {
+                  setCheckingStatus(false);
+                }
+              }
+            }}
+            style={{ 
+              backgroundColor: colors.surface, 
+              borderRadius: 28, 
+              alignItems: 'center', 
+              justifyContent: 'center', 
+              height: 56, 
+              borderWidth: 2,
+              borderColor: getStatusColor(data.applicationStatus || 'pending')
+            }}
+          >
+            {checkingStatus ? (
+              <ActivityIndicator color={getStatusColor(data.applicationStatus || 'pending')} />
+            ) : (
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Feather name="check-circle" size={20} color={getStatusColor(data.applicationStatus || 'pending')} style={{ marginRight: 8 }} />
+                <Text style={{ color: getStatusColor(data.applicationStatus || 'pending'), fontWeight: '700', fontSize: 16 }}>
+                  {getStatusLabel(data.applicationStatus || 'pending')}
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            activeOpacity={0.9}
+            onPress={async () => {
+              if (!studentProfile?.has_cv) {
+                setShowCVModal(true);
+                return;
+              }
+
               if (submitting) return;
-              setSubmitting(true);
-              // Simula envío
-              setTimeout(() => {
+
+              try {
+                const hasHardware = await LocalAuthentication.hasHardwareAsync();
+                const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+
+                if (hasHardware && isEnrolled) {
+                  const auth = await LocalAuthentication.authenticateAsync({
+                    promptMessage: 'Confirma tu identidad para aplicar',
+                    fallbackLabel: 'Usar código',
+                  });
+
+                  if (!auth.success) {
+                    Alert.alert('Error', 'Autenticación fallida');
+                    return;
+                  }
+                }
+
+                setSubmitting(true);
+                if (userToken && vacancy?.id) {
+                  await applyToVacancy(userToken, vacancy.id);
+                  (navigation as any).navigate('ApplicationSuccess');
+                }
+              } catch (error: any) {
+                Alert.alert('Error', error.message || 'No se pudo aplicar a la vacante');
+              } finally {
                 setSubmitting(false);
-                (navigation as any).navigate('ApplicationSuccess');
-              }, 1200);
+              }
             }}
             style={{ backgroundColor: colors.primary, borderRadius: 28, alignItems: 'center', justifyContent: 'center', height: 56, opacity: submitting ? 0.7 : 1 }}
             disabled={submitting}
-        >
-          {submitting ? (
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <ActivityIndicator color="#fff" style={{ marginRight: 8 }} />
-              <Text style={{ color: '#fff', fontWeight: '700' }}>{t('common.sending')}</Text>
-            </View>
-          ) : (
-            <Text style={{ color: '#fff', fontWeight: '700' }}>{t('common.apply')}</Text>
-          )}
-        </TouchableOpacity>
+          >
+            {submitting ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <ActivityIndicator color="#fff" style={{ marginRight: 8 }} />
+                <Text style={{ color: '#fff', fontWeight: '700' }}>{t('common.sending')}</Text>
+              </View>
+            ) : (
+              <Text style={{ color: '#fff', fontWeight: '700' }}>{t('common.apply')}</Text>
+            )}
+          </TouchableOpacity>
+        )}
       </View>
+
+      {/* Modal de Validación de CV */}
+      <Modal
+        animationType="slide"
+        transparent={false}
+        visible={showCVModal}
+        onRequestClose={() => setShowCVModal(false)}
+        presentationStyle="pageSheet"
+      >
+        <View style={{ flex: 1, backgroundColor: colors.card, padding: spacing(3), justifyContent: 'center', alignItems: 'center' }}>
+          <View style={{ width: 120, height: 120, backgroundColor: colors.chipBg, borderRadius: 60, alignItems: 'center', justifyContent: 'center', marginBottom: spacing(3) }}>
+            <FontAwesome5 name="user-astronaut" size={50} color={colors.primary} />
+          </View>
+          
+          <Text style={{ fontSize: typography.sizes.xxl, fontWeight: 'bold', color: colors.text, textAlign: 'center', marginBottom: spacing(2) }}>
+            ¡Estás a un paso! 🚀
+          </Text>
+          
+          <Text style={{ fontSize: typography.sizes.md, color: colors.textSecondary, textAlign: 'center', marginBottom: spacing(4), lineHeight: 24, paddingHorizontal: spacing(2) }}>
+            Para postularte a <Text style={{ fontWeight: 'bold', color: colors.text }}>{data.company}</Text> y desbloquear todas las vacantes, necesitamos generar tu CV profesional.
+          </Text>
+
+          <TouchableOpacity
+            style={{ backgroundColor: colors.primary, width: '100%', paddingVertical: 18, borderRadius: 16, alignItems: 'center', marginBottom: spacing(2), shadowColor: colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 }}
+            onPress={() => {
+              setShowCVModal(false);
+              (navigation as any).navigate('Onboarding', { screen: 'CVStart' });
+            }}
+          >
+            <Text style={{ color: '#FFF', fontWeight: 'bold', fontSize: 16 }}>Completar mi CV ahora</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={{ paddingVertical: 16 }}
+            onPress={() => setShowCVModal(false)}
+          >
+            <Text style={{ color: colors.textSecondary, fontWeight: '600', fontSize: 15 }}>Volver a la oferta</Text>
+          </TouchableOpacity>
+        </View>
+      </Modal>
     </View>
   );
 }

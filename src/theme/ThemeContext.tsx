@@ -11,6 +11,7 @@ export type ColorTokens = {
   border: string;
   chipBg: string;
   success: string;
+  error: string;
   skeletonBase: string;
   skeletonHighlight: string;
 };
@@ -25,6 +26,7 @@ export const lightColors: ColorTokens = {
   border: '#E5E7EB',
   chipBg: '#EEF2FF',
   success: '#10B981',
+  error: '#EF4444',
   skeletonBase: '#E5E7EB',       // gray-200 (contrasta con card/surface)
   skeletonHighlight: '#F3F4F6',  // gray-100
 };
@@ -39,6 +41,7 @@ export const darkColors: ColorTokens = {
   border: '#2C2C2C',          // Divider/border
   chipBg: '#1E1E1E',          // Fondo de chip coherente con surface
   success: '#34D399',
+  error: '#F87171',
   skeletonBase: '#2C2C2C',      // un poco más claro que card
   skeletonHighlight: '#3A3A3A', // highlight
 };

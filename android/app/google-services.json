@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "759022435570",
+    "project_id": "internifyu",
+    "storage_bucket": "internifyu.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:759022435570:android:66988f83c6cf68e574a46b",
+        "android_client_info": {
+          "package_name": "com.uni.internify"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyArs1roZDWFsU2Hn3ZYsV_tLysM2EAA-1c"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

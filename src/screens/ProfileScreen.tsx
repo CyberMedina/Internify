@@ -6,6 +6,7 @@ import { useNavigation } from '@react-navigation/native';
 import { Feather } from '@expo/vector-icons';
 import ScreenContainer from '../components/ScreenContainer';
 import { useI18n } from '../i18n/i18n';
+import { useAuth } from '../context/AuthContext';
 import { currentUser, internshipLevels } from '../mock/user';
 import LevelAvatar from '../components/LevelAvatar';
 
@@ -52,8 +53,17 @@ export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const { t } = useI18n();
+  const { logout } = useAuth();
 
   const canNavigateBackRef = React.useRef<boolean | null>(null);
+
+  const handleLogout = async () => {
+    await logout();
+    navigation.reset({
+      index: 0,
+      routes: [{ name: 'Login' as never }],
+    });
+  };
 
   // Calcular estado de pasantía (misma lógica que HomeScreen)
   const getInternshipStatus = (hours: number) => {
@@ -124,9 +134,12 @@ export default function ProfileScreen() {
 
           {/* Name + link */}
           <View style={{ flex: 1 }}>
-            <Text style={{ color: '#fff', fontWeight: '700', fontSize: typography.sizes.lg }}>{currentUser.name}</Text>
+            <Text style={{ color: '#fff', fontWeight: '700', fontSize: typography.sizes.lg }}>{`${currentUser.names} ${currentUser.lastnames}`}</Text>
             <Text style={{ color: '#E0E7FF', marginTop: 2, fontSize: typography.sizes.sm }}>{status.stage}</Text>
-            <TouchableOpacity style={{ marginTop: 4 }}>
+            <TouchableOpacity 
+              style={{ marginTop: 4 }}
+              onPress={() => (navigation as any).navigate('MyProfile')}
+            >
               <Text style={{ color: '#fff', fontWeight: '600', fontSize: typography.sizes.sm }}>{t('profile.viewProfile')} ›</Text>
             </TouchableOpacity>
           </View>
@@ -158,6 +171,37 @@ export default function ProfileScreen() {
           <Row label={t('profile.helpCenter')} icon="help-circle" />
           <Row label={t('profile.privacyPolicy')} icon="shield" />
           <Row label={t('profile.inviteFriends')} icon="users" />
+        </View>
+          
+        <View style={{ marginTop: spacing(2), backgroundColor: colors.surface }}>
+          <TouchableOpacity
+            onPress={handleLogout}
+            activeOpacity={0.75}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              paddingVertical: spacing(1.5),
+              paddingHorizontal: spacing(2),
+            }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <View
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 18,
+                  backgroundColor: colors.error + '15',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginRight: spacing(1.5),
+                }}
+              >
+                <Feather name="log-out" size={18} color={colors.error} />
+              </View>
+              <Text style={{ color: colors.error, fontSize: typography.sizes.md, fontWeight: '600' }}>Cerrar Sesión</Text>
+            </View>
+          </TouchableOpacity>
         </View>
       </ScreenContainer>
     </View>

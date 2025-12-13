@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
+import { View, Text, TouchableOpacity, Image } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
 import Chip from './Chip';
 import AvatarGroup from './AvatarGroup';
@@ -7,6 +7,7 @@ import { Feather } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useSaved } from '../context/SavedContext';
 import { useI18n } from '../i18n/i18n';
+import { getInitials } from '../utils/stringUtils';
 
 export type Job = {
   id: string;
@@ -17,6 +18,8 @@ export type Job = {
   applicants: number;
   salary: string;
   avatars: string[];
+  companyLogo?: string;
+  postedTime?: string;
 };
 
 type Props = { job: Job };
@@ -27,6 +30,10 @@ export default function JobCardLarge({ job }: Props) {
   const savedCtx = useSaved();
   const isSaved = savedCtx?.isSaved(job.id) ?? false;
   const { t } = useI18n();
+
+  // Debug log
+  // console.log(`[JobCardLarge] id=${job.id} postedTime=${job.postedTime}`);
+
   return (
     <TouchableOpacity
       onPress={() => navigation.navigate('JobDetail', { job })}
@@ -42,8 +49,12 @@ export default function JobCardLarge({ job }: Props) {
     >
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, paddingRight: spacing(1) }}>
-          <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: colors.chipBg, alignItems: 'center', justifyContent: 'center' }}>
-            <Text style={{ fontWeight: '800', color: colors.primary, fontSize: 18 }}>B</Text>
+          <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: colors.chipBg, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+            {job.companyLogo ? (
+              <Image source={{ uri: job.companyLogo }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+            ) : (
+              <Text style={{ fontWeight: '800', color: colors.primary, fontSize: 18 }}>{getInitials(job.company)}</Text>
+            )}
           </View>
           <View style={{ marginLeft: spacing(1), flex: 1 }}>
             <Text numberOfLines={1} style={{ fontSize: typography.sizes.lg, fontWeight: '700', color: colors.text }}>{job.title}</Text>
@@ -83,11 +94,25 @@ export default function JobCardLarge({ job }: Props) {
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <AvatarGroup avatars={job.avatars} />
           <Text style={{ textAlign: 'right' }}>
-            <Text style={{ color: colors.primary, fontWeight: '700', fontSize: typography.sizes.md, letterSpacing: 0.2 }}>{job.salary.split(' /')[0]}</Text>
-            <Text style={{ color: colors.textSecondary, fontSize: typography.sizes.sm }}>{' /mes'}</Text>
+            {job.salary === 'Anónimo' ? (
+              <Text style={{ color: colors.textSecondary, fontWeight: '700', fontSize: typography.sizes.md }}>Anónimo</Text>
+            ) : (
+              <>
+                <Text style={{ color: colors.primary, fontWeight: '700', fontSize: typography.sizes.md, letterSpacing: 0.2 }}>{job.salary.replace(' /mes', '')}</Text>
+                <Text style={{ color: colors.textSecondary, fontSize: typography.sizes.sm }}> / mes</Text>
+              </>
+            )}
           </Text>
         </View>
-  <Text style={{ color: colors.textSecondary, fontSize: typography.sizes.xs, marginTop: spacing(0.5) }}>{job.applicants} {t('common.applicants')}</Text>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: spacing(0.5) }}>
+          <Text style={{ color: colors.textSecondary, fontSize: typography.sizes.xs }}>{job.applicants} {t('common.applicants')}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Feather name="clock" size={12} color={colors.textSecondary} style={{ marginRight: 4 }} />
+            <Text style={{ color: colors.textSecondary, fontSize: typography.sizes.xs }}>
+              {job.postedTime || 'Reciente'}
+            </Text>
+          </View>
+        </View>
       </View>
     </TouchableOpacity>
   );

@@ -1,13 +1,14 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import HomeStack from './HomeStack';
+import SearchScreen from '../screens/SearchScreen';
+import SavedScreen from '../screens/SavedScreen';
 import { View, Text } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
-import SearchScreen from '../screens/SearchScreen';
-import SavedScreen from '../screens/SavedScreen';
+import MyApplicationsScreen from '../screens/MyApplicationsScreen';
 import { useI18n } from '../i18n/i18n';
 
 const Tab = createBottomTabNavigator();
@@ -42,7 +43,7 @@ export default function Tabs() {
         component={HomeStack}
         options={({ route }) => {
           const routeName = getFocusedRouteNameFromRoute(route) ?? 'HomeMain';
-          const hideTab = routeName === 'JobDetail' || routeName === 'ApplicationSuccess' || routeName === 'ProfileMain' || routeName === 'MyApplications';
+          const hideTab = routeName === 'JobDetail' || routeName === 'ApplicationSuccess' || routeName === 'ProfileMain' || routeName === 'MyApplications' || routeName === 'MyProfile' || routeName === 'ApplicationStatus';
           return {
             tabBarIcon: ({ color, size }) => <Feather name="home" size={size} color={color} />,
             tabBarStyle: hideTab
@@ -56,15 +57,18 @@ export default function Tabs() {
         component={SearchScreen}
         options={{ tabBarIcon: ({ color, size }) => <Feather name="search" size={size} color={color} /> }}
       />
+            <Tab.Screen
+        name="MyApplications"
+        component={MyApplicationsScreen}
+        options={{ 
+          title: 'Postulaciones',
+          tabBarIcon: ({ color, size }) => <Feather name="briefcase" size={size} color={color} /> 
+        }}
+      />
       <Tab.Screen
         name={t('tabs.saved')}
         component={SavedScreen}
         options={{ tabBarIcon: ({ color, size }) => <Feather name="bookmark" size={size} color={color} /> }}
-      />
-      <Tab.Screen
-        name={t('tabs.chat')}
-        children={() => <Placeholder title={t('tabs.chat')} />}
-        options={{ tabBarIcon: ({ color, size }) => <Ionicons name="chatbubble-outline" size={size} color={color} /> }}
       />
     </Tab.Navigator>
   );

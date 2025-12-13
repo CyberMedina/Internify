@@ -6,12 +6,14 @@ import { Feather } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useI18n } from '../i18n/i18n';
 import { StatusBar } from 'expo-status-bar';
+import { useAuth } from '../context/AuthContext';
 
 export default function SplashScreen() {
   const { colors, typography } = useTheme();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const { t } = useI18n();
+  const { isLoading, userToken } = useAuth();
 
   const scale = React.useRef(new Animated.Value(0.8)).current;
   const opacity = React.useRef(new Animated.Value(0)).current;
@@ -29,12 +31,20 @@ export default function SplashScreen() {
         Animated.timing(textTranslate, { toValue: 0, duration: 350, delay: 50, useNativeDriver: true }),
       ]),
     ]).start();
+  }, [opacity, scale, textOpacity, textTranslate]);
 
-    const timer = setTimeout(() => {
-      navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
-    }, 1400);
-    return () => clearTimeout(timer);
-  }, [navigation, opacity, scale, textOpacity, textTranslate]);
+  React.useEffect(() => {
+    if (!isLoading) {
+      const timer = setTimeout(() => {
+        if (userToken) {
+          navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
+        } else {
+          navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
+        }
+      }, 1400);
+      return () => clearTimeout(timer);
+    }
+  }, [isLoading, userToken, navigation]);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.primary, paddingTop: insets.top, paddingBottom: insets.bottom, alignItems: 'center', justifyContent: 'center' }}>

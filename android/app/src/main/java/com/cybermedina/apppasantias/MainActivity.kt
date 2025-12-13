@@ -8,6 +8,9 @@ import com.facebook.react.ReactActivityDelegate
 import com.facebook.react.defaults.DefaultNewArchitectureEntryPoint.fabricEnabled
 import com.facebook.react.defaults.DefaultReactActivityDelegate
 
+import com.uni.internify.BuildConfig
+import com.uni.internify.R
+
 import expo.modules.ReactActivityDelegateWrapper
 
 class MainActivity : ReactActivity() {

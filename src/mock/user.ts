@@ -36,8 +36,35 @@ export const internshipLevels: InternshipLevel[] = [
 
 export const currentUser = {
   id: 'u1',
-  name: 'Jhonatan Medina',
-  email: 'jhonatan@example.com',
-  hours: 350,
+  names: 'Jhonatan Jazmil',
+  lastnames: 'Medina Aguirre',
+  email: 'jhonatan.medina@est.uni.edu.ni',
+  hours: 1,
   avatar: null,
+  isProfileComplete: false,
+  profileProgress: 80,
+  // Extended mock data for onboarding
+  birthDate: '15/08/2003',
+  phone: '+505 85920121',
+  address: 'Managua, Nicaragua',
+  faculty: 'Facultad de Electrotecnia y Computación (FEC)',
+  career: 'Ingeniería en Computación',
+  
+  // CV Data
+  cvProfile: {
+    summary: '',
+    secondaryEducation: {
+      school: '',
+      title: '',
+      year: '',
+    },
+    experience: [] as any[],
+    skills: [] as string[],
+    certifications: [] as any[],
+    references: [
+      { name: '', contact: '' },
+      { name: '', contact: '' },
+      { name: '', contact: '' },
+    ],
+  }
 };
