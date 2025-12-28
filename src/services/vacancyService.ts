@@ -53,12 +53,17 @@ export const getVacancyDetail = async (token: string, id: number): Promise<{ dat
   }
 };
 
-export const getRecentVacancies = async (
+export const getVacancies = async (
   token: string,
   page: number = 1,
   limit: number = 10,
-  search: string = '',
-  categoryId?: number
+  filters: {
+    search?: string;
+    categoryId?: number;
+    internshipTypeId?: number;
+    modality?: string;
+    location?: string;
+  } = {}
 ): Promise<PaginatedResponse<Vacancy>> => {
   try {
     const params = new URLSearchParams({
@@ -66,16 +71,19 @@ export const getRecentVacancies = async (
       limit: limit.toString(),
     });
 
-    if (search) params.append('search', search);
-    if (categoryId) params.append('category_id', categoryId.toString());
+    if (filters.search) params.append('search', filters.search);
+    if (filters.categoryId) params.append('category_id', filters.categoryId.toString());
+    if (filters.internshipTypeId) params.append('internship_type_id', filters.internshipTypeId.toString());
+    if (filters.modality) params.append('modality', filters.modality);
+    if (filters.location) params.append('location', filters.location);
 
-    const response = await fetch(`${BASE_URL}/vacancies/recent?${params.toString()}`, {
+    const response = await fetch(`${BASE_URL}/vacancies?${params.toString()}`, {
       headers: getHeaders(token),
     });
-    if (!response.ok) throw new Error('Failed to fetch recent vacancies');
+    if (!response.ok) throw new Error('Failed to fetch vacancies');
     return await response.json();
   } catch (error) {
-    console.error('Error fetching recent vacancies:', error);
+    console.error('Error fetching vacancies:', error);
     throw error;
   }
 };

@@ -5,12 +5,14 @@ import SplashScreen from 'src/screens/SplashScreen';
 
 import LoginScreen from 'src/screens/LoginScreen';
 import OnboardingStack from './OnboardingStack';
+import JobDetailScreen from '../screens/JobDetailScreen';
 
 export type RootStackParamList = {
   Splash: undefined;
   Login: undefined;
   Onboarding: undefined;
   MainTabs: undefined;
+  JobDetail: { job: any } | undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -22,6 +24,7 @@ export default function RootStack() {
       <Stack.Screen name="Login" component={LoginScreen} />
       <Stack.Screen name="Onboarding" component={OnboardingStack} />
       <Stack.Screen name="MainTabs" component={Tabs} />
+      <Stack.Screen name="JobDetail" component={JobDetailScreen} />
     </Stack.Navigator>
   );
 }

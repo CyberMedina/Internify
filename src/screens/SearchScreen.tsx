@@ -1,130 +1,272 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, TextInput, FlatList, ScrollView } from 'react-native';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { View, Text, TouchableOpacity, TextInput, FlatList, ScrollView, ActivityIndicator } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import JobCardSmall from '../components/JobCardSmall';
 import { useI18n } from '../i18n/i18n';
-import { useNavigation } from '@react-navigation/native';
-
-// Reutilizamos el tipo Job desde JobCardSmall vía JobCardLarge
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useAuth } from '../context/AuthContext';
+import { getVacancies } from '../services/vacancyService';
+import { Vacancy } from '../types/vacancy';
 import type { Job } from '../components/JobCardLarge';
 import SearchSkeleton from './SearchSkeleton';
+import { LinearGradient } from 'expo-linear-gradient';
+import Animated, { FadeInDown } from 'react-native-reanimated';
+import { getRecentSearches, addRecentSearch, removeRecentSearch, getRecentlyViewed } from '../utils/storage';
 
-const recentSearchesInit = ['Diseñador UI', 'Diseñador Gráfico', 'Desarrollador React Native'];
-
-const recentViewsMock: Job[] = [
-  {
-    id: 'nv-1',
-    title: 'Desarrollador Node.js',
-    company: 'FlexiCraft Solutions',
-    location: 'Ciudad de México, MX',
-    tags: ['Medio tiempo', 'Remoto', 'Semi-Senior'],
-    applicants: 325,
-    salary: '$75k - $85k /mes',
-    avatars: [],
-  },
-  {
-    id: 'nv-2',
-    title: 'Editor de Video',
-    company: 'CloudCraze Labs',
-    location: 'Bogotá, CO',
-    tags: ['Contrato', 'Presencial', 'Asociado'],
-    applicants: 231,
-  salary: '$32 /h',
-    avatars: [],
-  },
-  {
-    id: 'nv-3',
-    title: 'Diseñador UX',
-    company: 'TitanTech Labs',
-    location: 'Lima, PE',
-    tags: ['Tiempo completo', 'Remoto', 'Junior'],
-    applicants: 152,
-  salary: '$48k - $55k /año',
-    avatars: [],
-  },
-];
+const mapVacancyToJob = (v: Vacancy): Job => ({
+  id: v.id.toString(),
+  title: v.title,
+  company: v.company.name,
+  location: v.location || 'N/A',
+  tags: v.tags && v.tags.length > 0 ? v.tags : (v.requirements && v.requirements.length > 0 ? v.requirements : (v.academic_programs || [])),
+  applicants: v.applicants_count ?? 0,
+  salary: v.salary_range ? `C$${v.salary_range}` : 'Anónimo',
+  avatars: [],
+  companyLogo: v.company.logo || v.company.photo,
+  postedTime: v.dates?.posted_human
+});
 
 export default function SearchScreen() {
   const { colors, spacing, radius, typography } = useTheme();
   const insets = useSafeAreaInsets();
   const { t } = useI18n();
   const navigation = useNavigation<any>();
-  const [query, setQuery] = React.useState('');
-  const [recentSearches, setRecentSearches] = React.useState(recentSearchesInit);
-  const [loading, setLoading] = React.useState(true);
+  const { userToken } = useAuth();
+  
+  const [query, setQuery] = useState('');
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const [results, setResults] = useState<Job[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [recentlyViewed, setRecentlyViewed] = useState<Job[]>([]);
+  
+  const inputRef = useRef<TextInput>(null);
 
-  const removeSearch = (text: string) => {
-    setRecentSearches((s) => s.filter((t) => t !== text));
+  const handleRemoveSearch = async (text: string) => {
+    const updated = await removeRecentSearch(text);
+    setRecentSearches(updated);
   };
 
-  React.useEffect(() => {
-    const timer = setTimeout(() => setLoading(false), 2000);
-    return () => clearTimeout(timer);
+  // Focus input when screen gains focus
+  useFocusEffect(
+    useCallback(() => {
+      const timer = setTimeout(() => {
+        inputRef.current?.focus();
+      }, 100);
+      
+      // Refresh recently viewed when screen gains focus
+      loadStorageData();
+      
+      return () => clearTimeout(timer);
+    }, [])
+  );
+
+  const loadStorageData = async () => {
+    const searches = await getRecentSearches();
+    setRecentSearches(searches);
+    const viewed = await getRecentlyViewed();
+    setRecentlyViewed(viewed);
+  };
+
+  // Initial load
+  useEffect(() => {
+    const init = async () => {
+      await loadStorageData();
+      setInitialLoading(false);
+    };
+    init();
   }, []);
 
-  if (loading) {
+  // Search with debounce
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (query.trim()) {
+        performSearch(query);
+      } else {
+        setResults([]);
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  // Save search history with longer delay (quality check)
+  useEffect(() => {
+    const timer = setTimeout(async () => {
+      const cleanText = query.trim().replace(/\s+/g, ' ');
+      if (cleanText.length > 2) {
+         await addRecentSearch(cleanText);
+         const searches = await getRecentSearches();
+         setRecentSearches(searches);
+      }
+    }, 3000); // 3 seconds delay to ensure it's a "quality" search
+
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  const performSearch = async (searchText: string) => {
+    if (!userToken) return;
+    
+    // Limpiar espacios al inicio, final y múltiples espacios intermedios
+    const cleanText = searchText.trim().replace(/\s+/g, ' ');
+    
+    if (!cleanText) {
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    
+    try {
+      const res = await getVacancies(userToken, 1, 20, { search: cleanText });
+      setResults(res.data.map(mapVacancyToJob));
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (initialLoading) {
     return <SearchSkeleton />;
   }
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.card }}>
-      {/* Header con back, input y filtro */}
-      <View style={{ paddingTop: insets.top + spacing(1), paddingHorizontal: spacing(2), paddingBottom: spacing(1) }}>
+      {/* Header con Gradiente similar al Home */}
+      <LinearGradient
+        colors={[colors.primary, '#4338ca']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={{ 
+          paddingTop: insets.top + spacing(1), 
+          paddingBottom: spacing(2), 
+          paddingHorizontal: spacing(2),
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.15,
+          shadowRadius: 12,
+          elevation: 8,
+          borderBottomLeftRadius: 25,
+          borderBottomRightRadius: 25,
+        }}
+      >
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
           <TouchableOpacity
             onPress={() => {
               if (navigation.canGoBack()) navigation.goBack();
               else navigation.getParent()?.navigate(t('tabs.home'));
             }}
-            style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' }}>
-            <Feather name="arrow-left" size={18} color={colors.text} />
+            style={{ 
+              width: 40, 
+              height: 40, 
+              borderRadius: 12, 
+              backgroundColor: 'rgba(255,255,255,0.2)', 
+              alignItems: 'center', 
+              justifyContent: 'center',
+              marginRight: spacing(1)
+            }}>
+            <Feather name="arrow-left" size={20} color="#FFF" />
           </TouchableOpacity>
-          <View style={{ flex: 1, marginHorizontal: spacing(1) }}>
-            <View style={{ height: 40, borderRadius: 20, backgroundColor: colors.surface, flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing(1.5), borderWidth: 1, borderColor: colors.border }}>
-              <Feather name="search" size={16} color={colors.textSecondary} />
-              <TextInput
-                placeholder={t('common.searchPlaceholder')}
-                placeholderTextColor={colors.textSecondary}
-                value={query}
-                onChangeText={setQuery}
-                style={{ flex: 1, marginLeft: 8, color: colors.text }}
-              />
-              <TouchableOpacity>
-                <Feather name="sliders" size={18} color={colors.textSecondary} />
+          
+          <View style={{ flex: 1, backgroundColor: colors.surface, borderRadius: 16, flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing(1.5), height: 44 }}>
+            <Feather name="search" size={18} color={colors.textSecondary} />
+            <TextInput
+              ref={inputRef}
+              placeholder={t('common.searchPlaceholder')}
+              placeholderTextColor={colors.textSecondary}
+              value={query}
+              onChangeText={setQuery}
+              style={{ flex: 1, marginLeft: 8, color: colors.text }}
+              autoCapitalize="none"
+              autoCorrect={false}
+              returnKeyType="search"
+              clearButtonMode="always"
+              onSubmitEditing={() => {
+                 const cleanText = query.trim().replace(/\s+/g, ' ');
+                 if (cleanText.length > 2) {
+                    addRecentSearch(cleanText).then(searches => setRecentSearches(searches));
+                 }
+              }}
+            />
+            {query.length > 0 && (
+              <TouchableOpacity
+                onPress={() => {
+                  setQuery('');
+                  inputRef.current?.focus();
+                }}
+                accessibilityLabel="Limpiar búsqueda"
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                style={{ padding: 4 }}
+              >
+                <Feather name="x" size={18} color={colors.textSecondary} />
               </TouchableOpacity>
-            </View>
+            )}
           </View>
-        </View>
-      </View>
 
-      <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + spacing(3) }}>
-        {/* Búsquedas recientes */}
-        <View style={{ paddingHorizontal: spacing(2), marginTop: spacing(1) }}>
-          <Text style={{ color: colors.text, fontWeight: '700' }}>{t('search.recentSearches')}</Text>
-          <View style={{ marginTop: spacing(1) }}>
-            {recentSearches.map((t) => (
-              <View key={t} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: spacing(1), borderBottomColor: colors.border, borderBottomWidth: 1 }}>
-                <Text style={{ color: colors.textSecondary }}>{t}</Text>
-                <TouchableOpacity onPress={() => removeSearch(t)}>
-                  <Feather name="x" size={18} color={colors.textSecondary} />
-                </TouchableOpacity>
+          <TouchableOpacity style={{ marginLeft: spacing(1), backgroundColor: '#FFD166', width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' }}>
+            <Feather name="sliders" size={18} color={colors.text} />
+          </TouchableOpacity>
+        </View>
+      </LinearGradient>
+
+      <Animated.ScrollView 
+        entering={FadeInDown.duration(400).springify()}
+        contentContainerStyle={{ paddingBottom: insets.bottom + spacing(3) }}
+      >
+        {query.trim() === '' ? (
+          <>
+            {/* Búsquedas recientes */}
+            {recentSearches.length > 0 && (
+              <View style={{ paddingHorizontal: spacing(2), marginTop: spacing(1) }}>
+                <Text style={{ color: colors.text, fontWeight: '700' }}>{t('search.recentSearches')}</Text>
+                <View style={{ marginTop: spacing(1) }}>
+                  {recentSearches.map((t) => (
+                    <TouchableOpacity 
+                      key={t} 
+                      onPress={() => setQuery(t)}
+                      style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: spacing(1), borderBottomColor: colors.border, borderBottomWidth: 1 }}
+                    >
+                      <Text style={{ color: colors.textSecondary }}>{t}</Text>
+                      <TouchableOpacity onPress={() => handleRemoveSearch(t)}>
+                        <Feather name="x" size={18} color={colors.textSecondary} />
+                      </TouchableOpacity>
+                    </TouchableOpacity>
+                  ))}
+                </View>
               </View>
-            ))}
-          </View>
-        </View>
+            )}
 
-        {/* Vistos recientemente */}
-        <View style={{ paddingHorizontal: spacing(2), marginTop: spacing(2) }}>
-          <Text style={{ color: colors.text, fontWeight: '700' }}>{t('search.recentlyViewed')}</Text>
-          <View style={{ marginTop: spacing(1) }}>
-            {recentViewsMock.map((job) => (
-              <JobCardSmall key={job.id} job={job} applicantsLabel="Postulantes" />
-            ))}
+            {/* Vistos recientemente */}
+            {recentlyViewed.length > 0 && (
+              <View style={{ paddingHorizontal: spacing(2), marginTop: spacing(2) }}>
+                <Text style={{ color: colors.text, fontWeight: '700' }}>{t('search.recentlyViewed')}</Text>
+                <View style={{ marginTop: spacing(1) }}>
+                  {recentlyViewed.map((job) => (
+                    <JobCardSmall key={job.id} job={job} applicantsLabel="Postulantes" />
+                  ))}
+                </View>
+              </View>
+            )}
+          </>
+        ) : (
+          <View style={{ paddingHorizontal: spacing(2), marginTop: spacing(1) }}>
+            {loading ? (
+              <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 20 }} />
+            ) : (
+              <>
+                <Text style={{ color: colors.textSecondary, marginBottom: spacing(1) }}>
+                  {results.length} resultados encontrados
+                </Text>
+                {results.map((job) => (
+                  <JobCardSmall key={job.id} job={job} applicantsLabel="Postulantes" />
+                ))}
+              </>
+            )}
           </View>
-        </View>
-      </ScrollView>
+        )}
+      </Animated.ScrollView>
     </View>
   );
 }

@@ -1,8 +1,16 @@
 import React, { useCallback, useEffect, useState, useMemo } from 'react';
-import { View, Text, ScrollView, TextInput, TouchableOpacity, FlatList, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, TextInput, TouchableOpacity, FlatList, ActivityIndicator, Platform } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../theme/ThemeContext';
 import { Feather } from '@expo/vector-icons';
+import Animated, { 
+  useSharedValue, 
+  useAnimatedStyle, 
+  useAnimatedScrollHandler, 
+  interpolate, 
+  Extrapolation 
+} from 'react-native-reanimated';
+import { LinearGradient } from 'expo-linear-gradient';
 import JobCardLarge, { Job } from '../components/JobCardLarge';
 import JobCardSmall from '../components/JobCardSmall';
 import Chip from '../components/Chip';
@@ -16,7 +24,7 @@ import SkeletonChip from '../components/skeletons/SkeletonChip';
 import { useI18n } from '../i18n/i18n';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
-import { getSuggestedVacancies, getCategories, getRecentVacancies } from '../services/vacancyService';
+import { getSuggestedVacancies, getCategories, getVacancies } from '../services/vacancyService';
 import { Vacancy, Category } from '../types/vacancy';
 
 const mapVacancyToJob = (v: Vacancy): Job => ({
@@ -119,7 +127,7 @@ export default function HomeScreen() {
     }
     
     try {
-      const res = await getRecentVacancies(userToken, pageNum, 10, search, catId || undefined);
+      const res = await getVacancies(userToken, pageNum, 10, { search, categoryId: catId || undefined });
       
       // DEBUG LOGS
       if (res.data && res.data.length > 0) {
@@ -250,17 +258,61 @@ export default function HomeScreen() {
   const hour = new Date().getHours();
   const saludo = hour < 12 ? t('home.goodMorning') : hour < 19 ? t('home.goodAfternoon') : t('home.goodEvening');
 
+  // Animation Constants & Logic
+  const scrollY = useSharedValue(0);
+  const scrollHandler = useAnimatedScrollHandler((event) => {
+    scrollY.value = event.contentOffset.y;
+  });
+
+  // Alturas estimadas para la animación
+  // Avatar Row: ~48px height + margins. Vamos a animar un contenedor de ~70px a 0.
+  const AVATAR_SECTION_HEIGHT = 70;
+  
+  const avatarAnimatedStyle = useAnimatedStyle(() => {
+    const height = interpolate(scrollY.value, [0, AVATAR_SECTION_HEIGHT], [AVATAR_SECTION_HEIGHT, 0], Extrapolation.CLAMP);
+    const opacity = interpolate(scrollY.value, [0, AVATAR_SECTION_HEIGHT * 0.6], [1, 0], Extrapolation.CLAMP);
+    const translateY = interpolate(scrollY.value, [0, AVATAR_SECTION_HEIGHT], [0, -20], Extrapolation.CLAMP);
+    
+    return {
+      height,
+      opacity,
+      transform: [{ translateY }],
+      overflow: 'hidden',
+    };
+  });
+
+  const headerContainerAnimatedStyle = useAnimatedStyle(() => {
+    // Mantenemos un radio mínimo de 25px incluso al colapsar, o podemos reducirlo ligeramente si se desea.
+    // La instrucción pide "Aplica un borderRadius de 25px... para que no sea un corte recto".
+    // Vamos a mantenerlo fijo en 25px o interpolarlo muy poco (ej. 25 -> 20).
+    // Si el usuario quiere que NO sea recto, entonces no debemos llegar a 0.
+    const borderRadius = interpolate(scrollY.value, [0, AVATAR_SECTION_HEIGHT], [30, 25], Extrapolation.CLAMP);
+    return {
+      borderBottomLeftRadius: borderRadius,
+      borderBottomRightRadius: borderRadius,
+    };
+  });
+
+  // Padding top para el contenido: Insets + Avatar (70) + Search (approx 80) + Chips (approx 50)
+  // Search Row: marginTop(16) + height(44) + paddingBottom(16) = ~76px
+  // Chips Row: ~50px + marginTop(10) = ~60px
+  // Total Expanded: Insets + 70 + 76 + 60 = Insets + 206
+  const CONTENT_PADDING_TOP = insets.top + 206;
+
+  // Animated Linear Gradient
+  const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
+
   if (loading) {
     return <HomeSkeleton />;
   }
 
-  const renderHeader = () => (
-    <View>
+  const renderListHeader = () => (
+    <View style={{ paddingTop: spacing(2) }}>
       {/* Widget de Progreso del Perfil */}
       {studentProfile && !studentProfile.has_cv && (
         <View style={{ 
           marginHorizontal: spacing(2), 
-          marginTop: spacing(2), 
+          marginBottom: spacing(2), 
           padding: spacing(2.5), 
           backgroundColor: colors.surface, 
           borderRadius: 20, 
@@ -319,7 +371,7 @@ export default function HomeScreen() {
 
       {/* Suggested */}
       {suggested.length > 0 && (
-        <View style={{ paddingHorizontal: spacing(2), marginTop: spacing(2) }}>
+        <View style={{ paddingHorizontal: spacing(2), marginBottom: spacing(2) }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
             <Text style={{ fontSize: typography.sizes.lg, fontWeight: '700', color: colors.text }}>{t('home.suggested')}</Text>
             <TouchableOpacity>
@@ -341,123 +393,146 @@ export default function HomeScreen() {
         </View>
       )}
 
-      {/* Recent Header & Categories */}
-      <View style={{ paddingHorizontal: spacing(2), marginTop: spacing(1.5) }}>
-        <Text style={{ fontSize: typography.sizes.lg, fontWeight: '700', color: colors.text, marginBottom: spacing(1) }}>{t('home.recent')}</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} nestedScrollEnabled contentContainerStyle={{ paddingVertical: spacing(0.5) }}>
-          {careerCategory && (
-            <Chip 
-              key={careerCategory.id} 
-              label={careerCategory.pseudonym || careerCategory.name} 
-              active={activeCatId === careerCategory.id} 
-              onPress={() => handleCategoryPress(careerCategory.id)} 
-            />
-          )}
-          <Chip 
-            key="all" 
-            label="Todos" 
-            active={activeCatId === null} 
-            onPress={() => handleCategoryPress(null)} 
-          />
-          {otherCategories.map((c) => (
-            <Chip 
-              key={c.id} 
-              label={c.pseudonym || c.name} 
-              active={activeCatId === c.id} 
-              onPress={() => handleCategoryPress(c.id)} 
-            />
-          ))}
-        </ScrollView>
+      {/* Recent Header Title */}
+      <View style={{ paddingHorizontal: spacing(2), marginBottom: spacing(1) }}>
+        <Text style={{ fontSize: typography.sizes.lg, fontWeight: '700', color: colors.text }}>{t('home.recent')}</Text>
       </View>
     </View>
   );
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.card }}>
-      {/* Header con saludo y acciones - Sticky */}
-      <View style={{ 
-        backgroundColor: colors.primary, 
-        paddingTop: insets.top + spacing(2), 
-        paddingHorizontal: spacing(2), 
-        paddingBottom: spacing(2), 
-        borderBottomLeftRadius: 24, 
-        borderBottomRightRadius: 24,
-        zIndex: 10,
-        elevation: 4
-      }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-            <TouchableOpacity onPress={() => navigation.navigate('ProfileMain')} activeOpacity={0.8}>
-              <LevelAvatar 
-                progress={status.progress} 
-                size={48} 
-                color={status.color}
-                badgeContent={status.badge}
-                imageUri={studentProfile?.profile?.photo || undefined}
-              />
-            </TouchableOpacity>
-            <View style={{ marginLeft: spacing(1.5) }}>
-              <Text style={{ color: '#E0E7FF' }}>{t('home.hello', { name: displayName })}</Text>
-              <Text style={{ color: '#fff', fontWeight: '800', fontSize: typography.sizes.xl }}>{saludo}</Text>
+      {/* Header Animado Absoluto */}
+      <View style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 100 }}>
+        {/* Parte Azul (Avatar + Buscador) con Gradiente */}
+        <AnimatedLinearGradient
+          colors={[colors.primary, '#4338ca']} // Gradiente de primary a un tono índigo más oscuro
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[
+            { 
+              paddingTop: insets.top + spacing(2), 
+              paddingBottom: spacing(2),
+              zIndex: 10,
+              // Shadow sutil para profundidad
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.15,
+              shadowRadius: 12,
+              elevation: 8,
+            },
+            headerContainerAnimatedStyle
+          ]}
+        >
+          {/* Avatar y Saludo (Colapsable) */}
+          <Animated.View style={[avatarAnimatedStyle, { paddingHorizontal: spacing(2) }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing(1) }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                <TouchableOpacity onPress={() => navigation.navigate('ProfileMain')} activeOpacity={0.8}>
+                  <LevelAvatar 
+                    progress={status.progress} 
+                    size={48} 
+                    color={status.color}
+                    badgeContent={status.badge}
+                    imageUri={studentProfile?.profile?.photo || undefined}
+                  />
+                </TouchableOpacity>
+                <View style={{ marginLeft: spacing(1.5) }}>
+                  <Text style={{ color: '#E0E7FF' }}>{t('home.hello', { name: displayName })}</Text>
+                  <Text style={{ color: '#fff', fontWeight: '800', fontSize: typography.sizes.xl }}>{saludo}</Text>
+                </View>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <TouchableOpacity onPress={toggleScheme} style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' }}>
+                  <Feather name="bell" size={18} color="#fff" />
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <TouchableOpacity onPress={toggleScheme} style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' }}>
-              <Feather name="bell" size={18} color="#fff" />
+          </Animated.View>
+
+          {/* Barra de búsqueda (Siempre visible) */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20 }}>
+            <TouchableOpacity 
+              activeOpacity={0.9}
+              onPress={() => navigation.navigate(t('tabs.search'))}
+              style={{ flex: 1, backgroundColor: colors.surface, borderRadius: 16, flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing(1.5), height: 44 }}
+            >
+              <Feather name="search" size={18} color={colors.textSecondary} />
+              <Text style={{ marginLeft: 8, flex: 1, color: colors.textSecondary }}>
+                {t('common.searchPlaceholder')}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={{ marginLeft: spacing(1), backgroundColor: '#FFD166', width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' }}>
+              <Feather name="sliders" size={18} color={colors.text} />
             </TouchableOpacity>
           </View>
-        </View>
+        </AnimatedLinearGradient>
 
-        {/* Barra de búsqueda */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: spacing(2) }}>
-          <View style={{ flex: 1, backgroundColor: colors.surface, borderRadius: 16, flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing(1.5), height: 44 }}>
-            <Feather name="search" size={18} color={colors.textSecondary} />
-            <TextInput 
-              placeholder={t('common.searchPlaceholder')} 
-              placeholderTextColor={colors.textSecondary} 
-              style={{ marginLeft: 8, flex: 1, color: colors.text }}
-              value={searchText}
-              onChangeText={setSearchText}
+        {/* Chips Sticky (Debajo del Header Azul) */}
+        <View style={{ backgroundColor: colors.card, paddingBottom: spacing(1.5), paddingTop: spacing(2.5) }}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: spacing(2) }}>
+            {careerCategory && (
+              <Chip 
+                key={careerCategory.id} 
+                label={careerCategory.pseudonym || careerCategory.name} 
+                active={activeCatId === careerCategory.id} 
+                onPress={() => handleCategoryPress(careerCategory.id)} 
+              />
+            )}
+            <Chip 
+              key="all" 
+              label="Todos" 
+              active={activeCatId === null} 
+              onPress={() => handleCategoryPress(null)} 
             />
-          </View>
-          <TouchableOpacity style={{ marginLeft: spacing(1), backgroundColor: '#FFD166', width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' }}>
-            <Feather name="sliders" size={18} color={colors.text} />
-          </TouchableOpacity>
+            {otherCategories.map((c) => (
+              <Chip 
+                key={c.id} 
+                label={c.pseudonym || c.name} 
+                active={activeCatId === c.id} 
+                onPress={() => handleCategoryPress(c.id)} 
+              />
+            ))}
+          </ScrollView>
         </View>
       </View>
 
-      <ScreenContainer scroll={false} style={{ paddingTop: 0 }} safeBottom={false}>
-        <FlatList
-          data={recent}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <View style={{ paddingHorizontal: spacing(2) }}>
-              <JobCardSmall job={item} />
+      {/* Contenido Scrolleable */}
+      <Animated.FlatList
+        data={recent}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item }) => (
+          <View style={{ paddingHorizontal: spacing(2) }}>
+            <JobCardSmall job={item} />
+          </View>
+        )}
+        ListHeaderComponent={renderListHeader}
+        ListEmptyComponent={
+          !loading && !refreshing && (
+            <View style={{ padding: spacing(4), alignItems: 'center', justifyContent: 'center', marginTop: spacing(2) }}>
+              <Feather name="inbox" size={48} color={colors.textSecondary} style={{ marginBottom: spacing(2), opacity: 0.5 }} />
+              <Text style={{ color: colors.textSecondary, textAlign: 'center', fontSize: typography.sizes.md }}>
+                {t('common.noJobsAvailable')}
+              </Text>
             </View>
-          )}
-          ListHeaderComponent={renderHeader}
-          ListEmptyComponent={
-            !loading && !refreshing && (
-              <View style={{ padding: spacing(4), alignItems: 'center', justifyContent: 'center', marginTop: spacing(2) }}>
-                <Feather name="inbox" size={48} color={colors.textSecondary} style={{ marginBottom: spacing(2), opacity: 0.5 }} />
-                <Text style={{ color: colors.textSecondary, textAlign: 'center', fontSize: typography.sizes.md }}>
-                  {t('common.noJobsAvailable')}
-                </Text>
-              </View>
-            )
-          }
-          onEndReached={handleLoadMore}
-          onEndReachedThreshold={0.5}
-          refreshing={refreshing}
-          onRefresh={onRefresh}
-          ListFooterComponent={loadingMore ? (
-            <View style={{ paddingVertical: 20, alignItems: 'center', width: '100%' }}>
-              <ActivityIndicator color={colors.primary} />
-            </View>
-          ) : <View style={{ height: 20 }} />}
-          contentContainerStyle={{ paddingBottom: spacing(2) }}
-        />
-      </ScreenContainer>
+          )
+        }
+        onScroll={scrollHandler}
+        scrollEventThrottle={16}
+        contentContainerStyle={{ paddingTop: CONTENT_PADDING_TOP, paddingBottom: spacing(2) }}
+        showsVerticalScrollIndicator={true}
+        scrollIndicatorInsets={{ top: CONTENT_PADDING_TOP }}
+        progressViewOffset={CONTENT_PADDING_TOP}
+        onEndReached={handleLoadMore}
+        onEndReachedThreshold={0.5}
+        refreshing={refreshing}
+        onRefresh={onRefresh}
+        ListFooterComponent={loadingMore ? (
+          <View style={{ paddingVertical: 20, alignItems: 'center', width: '100%' }}>
+            <ActivityIndicator color={colors.primary} />
+          </View>
+        ) : <View style={{ height: 20 }} />}
+      />
     </View>
   );
 }

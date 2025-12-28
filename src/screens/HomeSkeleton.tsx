@@ -9,8 +9,14 @@ import SkeletonJobCardSmall from '../components/skeletons/SkeletonJobCardSmall';
 export default function HomeSkeleton() {
   const { colors, spacing } = useTheme();
   return (
-    <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: spacing(3) }}>
-      {/* Header */}
+    <View style={{ flex: 1, backgroundColor: colors.card }}>
+      <ScrollView 
+        style={{ flex: 1 }} 
+        contentContainerStyle={{ paddingBottom: spacing(3) }}
+        scrollEnabled={false}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Header */}
       <View style={{ backgroundColor: colors.primary, paddingTop: spacing(5), paddingHorizontal: spacing(2), paddingBottom: spacing(2), borderBottomLeftRadius: 24, borderBottomRightRadius: 24 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
@@ -56,5 +62,6 @@ export default function HomeSkeleton() {
         </View>
       </View>
     </ScrollView>
+    </View>
   );
 }

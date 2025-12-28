@@ -43,7 +43,7 @@ export default function Tabs() {
         component={HomeStack}
         options={({ route }) => {
           const routeName = getFocusedRouteNameFromRoute(route) ?? 'HomeMain';
-          const hideTab = routeName === 'JobDetail' || routeName === 'ApplicationSuccess' || routeName === 'ProfileMain' || routeName === 'MyApplications' || routeName === 'MyProfile' || routeName === 'ApplicationStatus';
+          const hideTab = routeName === 'ApplicationSuccess' || routeName === 'ProfileMain' || routeName === 'MyApplications' || routeName === 'MyProfile' || routeName === 'ApplicationStatus';
           return {
             tabBarIcon: ({ color, size }) => <Feather name="home" size={size} color={color} />,
             tabBarStyle: hideTab

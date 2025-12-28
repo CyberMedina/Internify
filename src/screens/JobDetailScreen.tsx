@@ -1,5 +1,8 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, ActivityIndicator, Modal, StyleSheet, Image, Share } from 'react-native';
+import { View, Text, TouchableOpacity, ActivityIndicator, Modal, StyleSheet, Image, Share, Platform } from 'react-native';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
+import SocialShare from 'react-native-share';
 import { useTheme } from '../theme/ThemeContext';
 import { Feather, FontAwesome5 } from '@expo/vector-icons';
 import ScreenContainer from '../components/ScreenContainer';
@@ -16,6 +19,7 @@ import { useAuth } from '../context/AuthContext';
 import JobDetailSkeleton from './JobDetailSkeleton';
 import { getInitials } from '../utils/stringUtils';
 import * as LocalAuthentication from 'expo-local-authentication';
+import { addRecentlyViewed } from '../utils/storage';
 
 export default function JobDetailScreen() {
   const { colors, spacing, radius, typography } = useTheme();
@@ -32,6 +36,14 @@ export default function JobDetailScreen() {
 
   const [vacancy, setVacancy] = React.useState<Vacancy | null>(null);
   const [loading, setLoading] = React.useState(true);
+  const [sharing, setSharing] = React.useState(false);
+  const isSharing = React.useRef(false);
+
+  React.useEffect(() => {
+    if (job) {
+      addRecentlyViewed(job);
+    }
+  }, [job]);
 
   React.useEffect(() => {
     const fetchDetail = async () => {
@@ -98,15 +110,88 @@ export default function JobDetailScreen() {
   };
 
   const handleShare = async () => {
+    if (isSharing.current) return;
+    isSharing.current = true;
+    setSharing(true);
+    
+    const message = `¡Mira esta vacante de ${data.title} en ${data.company}! \n\nUbicación: ${data.location}\nSalario: ${data.salary}\n\nDescarga la app para aplicar.`;
+
     try {
-      // TODO: Implementar endpoint de generación de imagen para compartir
-      const message = `¡Mira esta vacante de ${data.title} en ${data.company}! \n\nUbicación: ${data.location}\nSalario: ${data.salary}\n\nDescarga la app para aplicar.`;
+      const vacancyId = vacancy?.id || job?.id;
+
+      if (vacancyId) {
+        // Endpoint para obtener la imagen generada
+        const imageUrl = `https://overfoul-domingo-unharmable.ngrok-free.dev/api/vacancies/${vacancyId}/og-image`;
+        // Usar cacheDirectory con timestamp para evitar colisiones y problemas de caché
+        const filename = `vacancy-${vacancyId}-${Date.now()}.png`;
+        const fileUri = FileSystem.cacheDirectory + filename;
+
+        console.log('Downloading image from:', imageUrl);
+        // Descargar la imagen al sistema de archivos local
+        const downloadRes = await FileSystem.downloadAsync(imageUrl, fileUri);
+        
+        if (downloadRes.status !== 200) {
+          console.warn('Failed to download image, status:', downloadRes.status);
+          throw new Error('Failed to download image');
+        }
+
+        const { uri } = downloadRes;
+        console.log('Image downloaded to:', uri);
+
+        // Compartir la imagen descargada usando react-native-share
+        // Esto permite compartir imagen + texto en ambas plataformas (especialmente útil para WhatsApp en Android)
+        try {
+          await SocialShare.open({
+            title: `Compartir vacante: ${data.title}`,
+            message: message,
+            url: uri,
+            type: 'image/png',
+            failOnCancel: false, // No lanzar error si el usuario cancela
+          });
+        } catch (shareError) {
+          console.log('SocialShare error or cancelled:', shareError);
+          // Si falla react-native-share, intentamos con los métodos nativos/expo como fallback
+          if (Platform.OS === 'ios') {
+            await Share.share({
+              url: uri,
+              message
+            });
+          } else if (await Sharing.isAvailableAsync()) {
+            await Sharing.shareAsync(uri, {
+              mimeType: 'image/png',
+              dialogTitle: `Compartir vacante: ${data.title}`,
+              UTI: 'public.png'
+            });
+          }
+        }
+        return;
+      }
+
+      // Fallback: compartir solo texto si no se pudo descargar la imagen o no hay ID
       await Share.share({
         message,
         title: `Vacante: ${data.title}`
       });
-    } catch (error) {
-      console.error(error);
+    } catch (error: any) {
+      console.error('Error sharing:', error);
+      
+      // Si el error es que ya hay un share en proceso, no hacemos nada (el usuario ya está compartiendo)
+      if (error?.message && error.message.includes('Another share request is being processed')) {
+        return;
+      }
+
+      // Fallback en caso de otros errores
+      try {
+        await Share.share({
+          message,
+          title: `Vacante: ${data.title}`
+        });
+      } catch (e) {
+        console.error('Error in fallback share:', e);
+      }
+    } finally {
+      isSharing.current = false;
+      setSharing(false);
     }
   };
 
@@ -127,9 +212,14 @@ export default function JobDetailScreen() {
           {data.canApply && (
             <TouchableOpacity 
               onPress={handleShare}
-              style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', marginLeft: spacing(1) }}
+              disabled={sharing}
+              style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', marginLeft: spacing(1), opacity: sharing ? 0.5 : 1 }}
             >
-              <Feather name="share-2" size={18} color={colors.text} />
+              {sharing ? (
+                <ActivityIndicator size="small" color={colors.text} />
+              ) : (
+                <Feather name="share-2" size={18} color={colors.text} />
+              )}
             </TouchableOpacity>
           )}
         </View>
@@ -333,11 +423,16 @@ export default function JobDetailScreen() {
               </Text>
             </View>
             <TouchableOpacity
-              style={{ backgroundColor: colors.primary, borderRadius: 28, alignItems: 'center', justifyContent: 'center', height: 56, flexDirection: 'row' }}
+              style={{ backgroundColor: colors.primary, borderRadius: 28, alignItems: 'center', justifyContent: 'center', height: 56, flexDirection: 'row', opacity: sharing ? 0.7 : 1 }}
               onPress={handleShare}
+              disabled={sharing}
             >
-              <Feather name="share-2" size={20} color="#fff" style={{ marginRight: 8 }} />
-              <Text style={{ color: '#fff', fontWeight: '700' }}>Compartir con un amigo</Text>
+              {sharing ? (
+                <ActivityIndicator size="small" color="#fff" style={{ marginRight: 8 }} />
+              ) : (
+                <Feather name="share-2" size={20} color="#fff" style={{ marginRight: 8 }} />
+              )}
+              <Text style={{ color: '#fff', fontWeight: '700' }}>{sharing ? 'Compartiendo...' : 'Compartir con un amigo'}</Text>
             </TouchableOpacity>
           </View>
         ) : (
