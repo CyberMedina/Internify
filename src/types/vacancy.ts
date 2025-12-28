@@ -45,6 +45,8 @@ export interface Vacancy {
     id?: number;
     has_applied: boolean;
     status: string;
+    can_apply?: boolean;
+    rejection_reason?: string | null;
   };
   tags?: string[];
   applicants_count?: number;
@@ -65,12 +67,22 @@ export interface Category {
 }
 
 export interface PaginatedResponse<T> {
-  current_page: number;
   data: T[];
-  first_page_url: string;
-  next_page_url: string | null;
-  last_page: number;
-  total: number;
+  links: {
+    first: string;
+    last: string;
+    prev: string | null;
+    next: string | null;
+  };
+  meta: {
+    current_page: number;
+    from: number;
+    last_page: number;
+    path: string;
+    per_page: number;
+    to: number;
+    total: number;
+  };
 }
 
 export interface VacancyResponse {

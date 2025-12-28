@@ -35,6 +35,8 @@ export default function Chip({ label, active, onPress, style, variant = 'subtle'
           alignSelf: 'flex-start',
           maxWidth: '100%',
           flexShrink: 1,
+          justifyContent: 'center',
+          alignItems: 'center',
         },
         style,
       ]}
@@ -46,7 +48,6 @@ export default function Chip({ label, active, onPress, style, variant = 'subtle'
           color: active || variant === 'primary' ? '#fff' : colors.text,
           fontSize,
           fontWeight: '600',
-          lineHeight: 18,
         }}
       >
         {label}

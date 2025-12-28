@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState, useMemo } from 'react';
 import { View, Text, ScrollView, TextInput, TouchableOpacity, FlatList, ActivityIndicator } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../theme/ThemeContext';
@@ -138,7 +138,7 @@ export default function HomeScreen() {
         setRecent(prev => [...prev, ...newJobs]);
       }
       
-      setHasMore(!!res.next_page_url);
+      setHasMore(!!res.links.next);
     } catch (error) {
       console.error(error);
       setHasMore(false);
@@ -174,6 +174,34 @@ export default function HomeScreen() {
       setAutoSelected(true);
     }
   }, [studentProfile, categoriesList, autoSelected]);
+
+  const { careerCategory, otherCategories } = useMemo(() => {
+    let careerCat: Category | undefined;
+    let others: Category[] = [...categoriesList];
+
+    if (studentProfile?.academic_info?.career) {
+      const careerName = studentProfile.academic_info.career;
+      const normalize = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+      
+      const matchIndex = others.findIndex(c => 
+        normalize(c.name) === normalize(careerName) || 
+        (c.pseudonym && normalize(c.pseudonym) === normalize(careerName))
+      );
+
+      if (matchIndex !== -1) {
+        careerCat = others[matchIndex];
+        others.splice(matchIndex, 1);
+      }
+    }
+
+    others.sort((a, b) => {
+        const nameA = a.pseudonym || a.name;
+        const nameB = b.pseudonym || b.name;
+        return nameA.localeCompare(nameB);
+    });
+
+    return { careerCategory: careerCat, otherCategories: others };
+  }, [categoriesList, studentProfile]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -317,13 +345,21 @@ export default function HomeScreen() {
       <View style={{ paddingHorizontal: spacing(2), marginTop: spacing(1.5) }}>
         <Text style={{ fontSize: typography.sizes.lg, fontWeight: '700', color: colors.text, marginBottom: spacing(1) }}>{t('home.recent')}</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} nestedScrollEnabled contentContainerStyle={{ paddingVertical: spacing(0.5) }}>
+          {careerCategory && (
+            <Chip 
+              key={careerCategory.id} 
+              label={careerCategory.pseudonym || careerCategory.name} 
+              active={activeCatId === careerCategory.id} 
+              onPress={() => handleCategoryPress(careerCategory.id)} 
+            />
+          )}
           <Chip 
             key="all" 
             label="Todos" 
             active={activeCatId === null} 
             onPress={() => handleCategoryPress(null)} 
           />
-          {categoriesList.map((c) => (
+          {otherCategories.map((c) => (
             <Chip 
               key={c.id} 
               label={c.pseudonym || c.name} 
@@ -390,7 +426,7 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      <ScreenContainer scroll={false} style={{ paddingTop: 0 }}>
+      <ScreenContainer scroll={false} style={{ paddingTop: 0 }} safeBottom={false}>
         <FlatList
           data={recent}
           keyExtractor={(item) => item.id}
@@ -414,7 +450,11 @@ export default function HomeScreen() {
           onEndReachedThreshold={0.5}
           refreshing={refreshing}
           onRefresh={onRefresh}
-          ListFooterComponent={loadingMore ? <ActivityIndicator style={{ marginVertical: 20 }} color={colors.primary} /> : <View style={{ height: 20 }} />}
+          ListFooterComponent={loadingMore ? (
+            <View style={{ paddingVertical: 20, alignItems: 'center', width: '100%' }}>
+              <ActivityIndicator color={colors.primary} />
+            </View>
+          ) : <View style={{ height: 20 }} />}
           contentContainerStyle={{ paddingBottom: spacing(2) }}
         />
       </ScreenContainer>

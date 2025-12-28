@@ -24,8 +24,8 @@ export default function JobCardSmall({ job, applicantsLabel, bookmarked, onToggl
       activeOpacity={0.9}
       style={{ backgroundColor: colors.surface, padding: spacing(1.5), borderRadius: radius.md, marginBottom: spacing(1.5) }}
     >
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-        <View style={{ flexDirection: 'row' }}>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <View style={{ flexDirection: 'row', flex: 1, paddingRight: spacing(1) }}>
           <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: colors.chipBg, alignItems: 'center', justifyContent: 'center', marginRight: spacing(1), overflow: 'hidden' }}>
             {job.companyLogo ? (
               <Image source={{ uri: job.companyLogo }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
@@ -33,9 +33,9 @@ export default function JobCardSmall({ job, applicantsLabel, bookmarked, onToggl
               <Text style={{ fontWeight: '800', color: colors.primary }}>{getInitials(job.company)}</Text>
             )}
           </View>
-          <View>
-            <Text style={{ fontWeight: '700', color: colors.text }}>{job.title}</Text>
-            <Text style={{ color: colors.textSecondary, fontSize: typography.sizes.sm }}>{job.company}</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontWeight: '700', color: colors.text }} numberOfLines={2} ellipsizeMode="tail">{job.title}</Text>
+            <Text style={{ color: colors.textSecondary, fontSize: typography.sizes.sm }} numberOfLines={1} ellipsizeMode="tail">{job.company}</Text>
           </View>
         </View>
         <TouchableOpacity

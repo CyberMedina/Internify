@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, ActivityIndicator, Modal, StyleSheet, Image } from 'react-native';
+import { View, Text, TouchableOpacity, ActivityIndicator, Modal, StyleSheet, Image, Share } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
 import { Feather, FontAwesome5 } from '@expo/vector-icons';
 import ScreenContainer from '../components/ScreenContainer';
@@ -72,6 +72,8 @@ export default function JobDetailScreen() {
     companyDescription: vacancy?.company?.description,
     hasApplied: vacancy?.application?.has_applied ?? false,
     applicationStatus: vacancy?.application?.status,
+    canApply: vacancy?.application?.can_apply ?? true,
+    rejectionReason: vacancy?.application?.rejection_reason,
     postedHuman: vacancy?.dates?.posted_human
   };
 
@@ -95,6 +97,19 @@ export default function JobDetailScreen() {
     }
   };
 
+  const handleShare = async () => {
+    try {
+      // TODO: Implementar endpoint de generación de imagen para compartir
+      const message = `¡Mira esta vacante de ${data.title} en ${data.company}! \n\nUbicación: ${data.location}\nSalario: ${data.salary}\n\nDescarga la app para aplicar.`;
+      await Share.share({
+        message,
+        title: `Vacante: ${data.title}`
+      });
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.card }}>
       {/* Top actions (safe area) */}
@@ -109,9 +124,14 @@ export default function JobDetailScreen() {
           <TouchableOpacity style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' }}>
             <Feather name="bookmark" size={18} color={colors.primary} />
           </TouchableOpacity>
-          <TouchableOpacity style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', marginLeft: spacing(1) }}>
-            <Feather name="share-2" size={18} color={colors.text} />
-          </TouchableOpacity>
+          {data.canApply && (
+            <TouchableOpacity 
+              onPress={handleShare}
+              style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', marginLeft: spacing(1) }}
+            >
+              <Feather name="share-2" size={18} color={colors.text} />
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
@@ -304,6 +324,22 @@ export default function JobDetailScreen() {
               </View>
             )}
           </TouchableOpacity>
+        ) : !data.canApply ? (
+          <View>
+            <View style={{ backgroundColor: colors.primary + '15', padding: spacing(1.5), borderRadius: radius.md, marginBottom: spacing(1.5), flexDirection: 'row', alignItems: 'center' }}>
+              <Feather name="info" size={18} color={colors.primary} style={{ marginRight: 10 }} />
+              <Text style={{ color: colors.primary, fontSize: 13, flex: 1, fontWeight: '500' }}>
+                {data.rejectionReason || 'Tu perfil académico no coincide con los requisitos de esta vacante.'}
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={{ backgroundColor: colors.primary, borderRadius: 28, alignItems: 'center', justifyContent: 'center', height: 56, flexDirection: 'row' }}
+              onPress={handleShare}
+            >
+              <Feather name="share-2" size={20} color="#fff" style={{ marginRight: 8 }} />
+              <Text style={{ color: '#fff', fontWeight: '700' }}>Compartir con un amigo</Text>
+            </TouchableOpacity>
+          </View>
         ) : (
           <TouchableOpacity
             activeOpacity={0.9}
