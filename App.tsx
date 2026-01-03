@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
+import { NavigationContainer, DefaultTheme, DarkTheme, createNavigationContainerRef } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
 import { ThemeProvider, useTheme } from 'src/theme/ThemeContext';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -9,6 +9,8 @@ import { AuthProvider } from 'src/context/AuthContext';
 import { I18nProvider } from 'src/i18n/i18n';
 import * as Notifications from 'expo-notifications';
 import { registerForPushNotificationsAsync } from 'src/utils/notifications';
+
+export const navigationRef = createNavigationContainerRef<any>();
 
 function Root() {
   const { isDark } = useTheme();
@@ -25,7 +27,25 @@ function Root() {
     });
 
     responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
-      console.log(response);
+      const data = response.notification.request.content.data;
+      const type = data.type;
+
+      if (navigationRef.isReady()) {
+        switch (type) {
+          case 'vacancy_created':
+          case 'vacancy_status':
+            if (data.id) {
+              navigationRef.navigate('JobDetail', { job: { id: data.id } });
+            }
+            break;
+          case 'application_status':
+            navigationRef.navigate('MainTabs', { screen: 'MyApplications' });
+            break;
+          case 'test':
+            // Handle test notification if needed
+            break;
+        }
+      }
     });
 
     return () => {
@@ -35,7 +55,7 @@ function Root() {
   }, []);
 
   return (
-    <NavigationContainer theme={isDark ? DarkTheme : DefaultTheme}>
+    <NavigationContainer ref={navigationRef} theme={isDark ? DarkTheme : DefaultTheme}>
       <StatusBar style={isDark ? 'light' : 'dark'} />
       <RootStack />
     </NavigationContainer>

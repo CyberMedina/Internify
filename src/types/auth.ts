@@ -56,6 +56,7 @@ export interface StudentProfile {
     academic_level: string;
   };
   has_cv: boolean;
+  unread_notifications_count?: number;
 }
 
 export interface User extends LoginUserData {

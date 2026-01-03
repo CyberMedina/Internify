@@ -10,10 +10,11 @@ import { useAuth } from '../context/AuthContext';
 import { getVacancies } from '../services/vacancyService';
 import { Vacancy } from '../types/vacancy';
 import type { Job } from '../components/JobCardLarge';
-import SearchSkeleton from './SearchSkeleton';
+import Skeleton from '../components/Skeleton';
+import SkeletonJobCardSmall from '../components/skeletons/SkeletonJobCardSmall';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import { getRecentSearches, addRecentSearch, removeRecentSearch, getRecentlyViewed } from '../utils/storage';
+import { getRecentSearches, addRecentSearch, removeRecentSearch, getRecentlyViewed, clearRecentlyViewed } from '../utils/storage';
 
 const mapVacancyToJob = (v: Vacancy): Job => ({
   id: v.id.toString(),
@@ -128,10 +129,6 @@ export default function SearchScreen() {
     }
   };
 
-  if (initialLoading) {
-    return <SearchSkeleton />;
-  }
-
   return (
     <View style={{ flex: 1, backgroundColor: colors.card }}>
       {/* Header con Gradiente similar al Home */}
@@ -215,7 +212,27 @@ export default function SearchScreen() {
         entering={FadeInDown.duration(400).springify()}
         contentContainerStyle={{ paddingBottom: insets.bottom + spacing(3) }}
       >
-        {query.trim() === '' ? (
+        {initialLoading ? (
+          <View style={{ paddingTop: spacing(2) }}>
+            {/* Recent Searches Skeleton */}
+            <View style={{ paddingHorizontal: spacing(2), marginTop: spacing(1) }}>
+              <Skeleton width={'50%'} height={18} shimmer />
+              <View style={{ marginTop: spacing(1) }}>
+                <Skeleton width={'70%'} height={14} style={{ marginBottom: spacing(1) }} shimmer />
+                <Skeleton width={'60%'} height={14} style={{ marginBottom: spacing(1) }} shimmer />
+                <Skeleton width={'50%'} height={14} shimmer />
+              </View>
+            </View>
+            {/* Recently Viewed Skeleton */}
+            <View style={{ paddingHorizontal: spacing(2), marginTop: spacing(2) }}>
+              <Skeleton width={'60%'} height={18} shimmer />
+              <View style={{ marginTop: spacing(1) }}>
+                <SkeletonJobCardSmall />
+                <SkeletonJobCardSmall />
+              </View>
+            </View>
+          </View>
+        ) : query.trim() === '' ? (
           <>
             {/* Búsquedas recientes */}
             {recentSearches.length > 0 && (
@@ -241,7 +258,15 @@ export default function SearchScreen() {
             {/* Vistos recientemente */}
             {recentlyViewed.length > 0 && (
               <View style={{ paddingHorizontal: spacing(2), marginTop: spacing(2) }}>
-                <Text style={{ color: colors.text, fontWeight: '700' }}>{t('search.recentlyViewed')}</Text>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text style={{ color: colors.text, fontWeight: '700' }}>{t('search.recentlyViewed')}</Text>
+                  <TouchableOpacity onPress={async () => {
+                    await clearRecentlyViewed();
+                    setRecentlyViewed([]);
+                  }}>
+                    <Text style={{ color: colors.primary, fontSize: 12 }}>Borrar historial</Text>
+                  </TouchableOpacity>
+                </View>
                 <View style={{ marginTop: spacing(1) }}>
                   {recentlyViewed.map((job) => (
                     <JobCardSmall key={job.id} job={job} applicantsLabel="Postulantes" />

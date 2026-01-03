@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { View, Text, TouchableOpacity, Image } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
 import Chip from './Chip';
@@ -10,7 +10,7 @@ import { useSaved } from '../context/SavedContext';
 import { useI18n } from '../i18n/i18n';
 import { getInitials } from '../utils/stringUtils';
 
-export default function JobCardSmall({ job, applicantsLabel, bookmarked, onToggleBookmark }: { job: Job; applicantsLabel?: string; bookmarked?: boolean; onToggleBookmark?: () => void }) {
+const JobCardSmall = memo(({ job, applicantsLabel, bookmarked, onToggleBookmark, style }: { job: Job; applicantsLabel?: string; bookmarked?: boolean; onToggleBookmark?: () => void; style?: any }) => {
   const { colors, spacing, radius, typography } = useTheme();
   const navigation = useNavigation<any>();
   const savedCtx = useSaved();
@@ -22,7 +22,7 @@ export default function JobCardSmall({ job, applicantsLabel, bookmarked, onToggl
     <TouchableOpacity
       onPress={() => navigation.navigate('JobDetail', { job })}
       activeOpacity={0.9}
-      style={{ backgroundColor: colors.surface, padding: spacing(1.5), borderRadius: radius.md, marginBottom: spacing(1.5) }}
+      style={[{ backgroundColor: colors.surface, padding: spacing(1.5), borderRadius: radius.md, marginBottom: spacing(1.5) }, style]}
     >
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <View style={{ flexDirection: 'row', flex: 1, paddingRight: spacing(1) }}>
@@ -88,4 +88,6 @@ export default function JobCardSmall({ job, applicantsLabel, bookmarked, onToggl
       </View>
     </TouchableOpacity>
   );
-}
+});
+
+export default JobCardSmall;

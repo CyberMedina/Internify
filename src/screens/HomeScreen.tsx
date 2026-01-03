@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState, useMemo } from 'react';
-import { View, Text, ScrollView, TextInput, TouchableOpacity, FlatList, ActivityIndicator, Platform } from 'react-native';
+import { View, Text, ScrollView, TextInput, TouchableOpacity, FlatList, ActivityIndicator, Platform, LayoutAnimation, UIManager } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../theme/ThemeContext';
 import { Feather } from '@expo/vector-icons';
@@ -8,8 +8,16 @@ import Animated, {
   useAnimatedStyle, 
   useAnimatedScrollHandler, 
   interpolate, 
-  Extrapolation 
+  Extrapolation,
+  FadeIn,
+  FadeOut
 } from 'react-native-reanimated';
+
+if (Platform.OS === 'android') {
+  if (UIManager.setLayoutAnimationEnabledExperimental) {
+    UIManager.setLayoutAnimationEnabledExperimental(true);
+  }
+}
 import { LinearGradient } from 'expo-linear-gradient';
 import JobCardLarge, { Job } from '../components/JobCardLarge';
 import JobCardSmall from '../components/JobCardSmall';
@@ -62,6 +70,16 @@ export default function HomeScreen() {
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [autoSelected, setAutoSelected] = useState(false);
+  const [initialSetupDone, setInitialSetupDone] = useState(false);
+
+  // Cache state
+  type CacheEntry = {
+    data: Job[];
+    page: number;
+    hasMore: boolean;
+  };
+  const [vacanciesCache, setVacanciesCache] = useState<Record<string, CacheEntry>>({});
+  const [isCategoryLoading, setIsCategoryLoading] = useState(false);
 
   // Debounce search
   useEffect(() => {
@@ -88,15 +106,14 @@ export default function HomeScreen() {
         fetchCategories()
       ];
       
-      if (searchText === '') {
-        promises.push(fetchRecent(1, '', activeCatId));
-      }
+      // Removed fetchRecent from here to avoid double fetching
+      // It will be triggered by the useEffect once we determine the category
       
       await Promise.all(promises);
+      setInitialSetupDone(true);
     } catch (error) {
       console.error('Error loading initial data:', error);
-    } finally {
-      setLoading(false);
+      setLoading(false); // Only stop loading on error, otherwise wait for fetchRecent
     }
   };
 
@@ -129,59 +146,109 @@ export default function HomeScreen() {
     try {
       const res = await getVacancies(userToken, pageNum, 10, { search, categoryId: catId || undefined });
       
-      // DEBUG LOGS
-      if (res.data && res.data.length > 0) {
-        console.log('API Response Sample (dates):', JSON.stringify(res.data[0].dates, null, 2));
-      }
-
       const newJobs = res.data.map(mapVacancyToJob);
-
-      if (newJobs.length > 0) {
-        console.log('Mapped Job Sample (postedTime):', newJobs[0].postedTime);
-      }
+      const hasNextPage = !!res.links.next;
       
+      let updatedList: Job[] = [];
+
       if (pageNum === 1) {
+        updatedList = newJobs;
         setRecent(newJobs);
       } else {
-        setRecent(prev => [...prev, ...newJobs]);
+        setRecent(prev => {
+          const existingIds = new Set(prev.map(job => job.id));
+          const uniqueNewJobs = newJobs.filter(job => !existingIds.has(job.id));
+          updatedList = [...prev, ...uniqueNewJobs];
+          return updatedList;
+        });
       }
       
-      setHasMore(!!res.links.next);
+      setHasMore(hasNextPage);
+
+      // Update cache if no search
+      if (!search) {
+        const cacheKey = catId === null ? 'all' : catId.toString();
+        // We need to use the updated list for cache. 
+        // If pageNum > 1, we need the previous state + new jobs.
+        // Since setRecent is async, we can't rely on 'recent' state immediately here if we just set it.
+        // However, inside the setRecent callback we have the correct list.
+        // To simplify, we can just update the cache with what we know.
+        
+        // If pageNum === 1, updatedList is newJobs.
+        // If pageNum > 1, we need to reconstruct the list or use a functional update for cache too?
+        // Better approach: Use functional update for cache to ensure consistency
+        
+        setVacanciesCache(prevCache => {
+          const currentCache = prevCache[cacheKey];
+          let cachedList = pageNum === 1 ? [] : (currentCache?.data || []);
+          
+          if (pageNum > 1) {
+             const existingIds = new Set(cachedList.map(job => job.id));
+             const uniqueNewJobs = newJobs.filter(job => !existingIds.has(job.id));
+             cachedList = [...cachedList, ...uniqueNewJobs];
+          } else {
+             cachedList = newJobs;
+          }
+
+          return {
+            ...prevCache,
+            [cacheKey]: {
+              data: cachedList,
+              page: pageNum,
+              hasMore: hasNextPage
+            }
+          };
+        });
+      }
+
     } catch (error) {
       console.error(error);
       setHasMore(false);
     } finally {
       setLoadingMore(false);
+      setIsCategoryLoading(false);
     }
   };
 
   // Auto-select category based on career
   useEffect(() => {
-    if (!autoSelected && studentProfile?.academic_info?.career && categoriesList.length > 0) {
-      const careerName = studentProfile.academic_info.career;
-      // Normalize removing accents and special characters
-      const normalize = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
-      
-      console.log('Auto-select Debug:');
-      console.log('Student Career:', careerName);
-      console.log('Categories:', categoriesList.map(c => `${c.name} (${c.pseudonym})`).join(', '));
+    if (!initialSetupDone) return;
+    if (autoSelected) return;
 
-      const matchedCategory = categoriesList.find(c => 
-        normalize(c.name) === normalize(careerName) || 
-        (c.pseudonym && normalize(c.pseudonym) === normalize(careerName))
-      );
+    const performInitialFetch = async () => {
+      let targetCatId: number | null = null;
 
-      if (matchedCategory) {
-        console.log(`Auto-selecting category: ${matchedCategory.name}`);
-        setActiveCatId(matchedCategory.id);
-        setPage(1);
-        fetchRecent(1, searchText, matchedCategory.id);
-      } else {
-        console.log('No matching category found for career:', careerName);
+      if (studentProfile?.academic_info?.career && categoriesList.length > 0) {
+        const careerName = studentProfile.academic_info.career;
+        // Normalize removing accents and special characters
+        const normalize = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+        
+        console.log('Auto-select Debug:');
+        console.log('Student Career:', careerName);
+        console.log('Categories:', categoriesList.map(c => `${c.name} (${c.pseudonym})`).join(', '));
+
+        const matchedCategory = categoriesList.find(c => 
+          normalize(c.name) === normalize(careerName) || 
+          (c.pseudonym && normalize(c.pseudonym) === normalize(careerName))
+        );
+
+        if (matchedCategory) {
+          console.log(`Auto-selecting category: ${matchedCategory.name}`);
+          targetCatId = matchedCategory.id;
+        } else {
+          console.log('No matching category found for career:', careerName);
+        }
       }
+
+      setActiveCatId(targetCatId);
+      // We don't need to setPage(1) as it's default
+      await fetchRecent(1, searchText, targetCatId);
       setAutoSelected(true);
-    }
-  }, [studentProfile, categoriesList, autoSelected]);
+      setLoading(false);
+    };
+
+    performInitialFetch();
+  }, [initialSetupDone, studentProfile, categoriesList, autoSelected]);
 
   const { careerCategory, otherCategories } = useMemo(() => {
     let careerCat: Category | undefined;
@@ -220,9 +287,25 @@ export default function HomeScreen() {
 
   const handleCategoryPress = (catId: number | null) => {
     if (activeCatId === catId) return;
+    
+    // LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut); // Eliminamos LayoutAnimation para usar Reanimated
     setActiveCatId(catId);
-    setPage(1);
-    fetchRecent(1, searchText, catId);
+
+    const cacheKey = catId === null ? 'all' : catId.toString();
+    const cachedData = vacanciesCache[cacheKey];
+
+    // Optimistic update from cache
+    if (!searchText && cachedData) {
+      setRecent(cachedData.data);
+      setPage(cachedData.page);
+      setHasMore(cachedData.hasMore);
+      setIsCategoryLoading(false);
+    } else {
+      setPage(1);
+      setRecent([]);
+      setIsCategoryLoading(true);
+      fetchRecent(1, searchText, catId);
+    }
   };
 
   const handleLoadMore = () => {
@@ -301,6 +384,20 @@ export default function HomeScreen() {
 
   // Animated Linear Gradient
   const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
+
+  const renderItem = useCallback(({ item, index }: { item: Job, index: number }) => (
+    <Animated.View entering={FadeIn.duration(300)} exiting={FadeOut.duration(200)}>
+      <JobCardSmall 
+        job={item} 
+        style={{ marginHorizontal: spacing(2) }} 
+      />
+    </Animated.View>
+  ), [spacing]);
+
+  const keyExtractor = useCallback((item: Job) => item.id, []);
+
+  // Eliminamos getItemLayout porque las tarjetas tienen altura variable (texto dinámico)
+  // y una altura fija incorrecta causa saltos visuales ("pop") y espacios en blanco.
 
   if (loading) {
     return <HomeSkeleton />;
@@ -443,8 +540,27 @@ export default function HomeScreen() {
                 </View>
               </View>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <TouchableOpacity onPress={toggleScheme} style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' }}>
+                <TouchableOpacity onPress={() => navigation.navigate('Notifications')} style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' }}>
                   <Feather name="bell" size={18} color="#fff" />
+                  {studentProfile?.unread_notifications_count && studentProfile.unread_notifications_count > 0 ? (
+                    <View style={{
+                      position: 'absolute',
+                      top: -2,
+                      right: -2,
+                      backgroundColor: '#EF4444',
+                      borderRadius: 10,
+                      minWidth: 18,
+                      height: 18,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderWidth: 1.5,
+                      borderColor: colors.primary
+                    }}>
+                      <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold', paddingHorizontal: 4 }}>
+                        {studentProfile.unread_notifications_count > 99 ? '99+' : studentProfile.unread_notifications_count}
+                      </Text>
+                    </View>
+                  ) : null}
                 </TouchableOpacity>
               </View>
             </View>
@@ -454,7 +570,7 @@ export default function HomeScreen() {
           <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20 }}>
             <TouchableOpacity 
               activeOpacity={0.9}
-              onPress={() => navigation.navigate(t('tabs.search'))}
+              onPress={() => navigation.navigate('Search')}
               style={{ flex: 1, backgroundColor: colors.surface, borderRadius: 16, flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing(1.5), height: 44 }}
             >
               <Feather name="search" size={18} color={colors.textSecondary} />
@@ -499,22 +615,34 @@ export default function HomeScreen() {
 
       {/* Contenido Scrolleable */}
       <Animated.FlatList
+        key={activeCatId ? activeCatId.toString() : 'all'}
         data={recent}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <View style={{ paddingHorizontal: spacing(2) }}>
-            <JobCardSmall job={item} />
-          </View>
-        )}
+        keyExtractor={keyExtractor}
+        renderItem={renderItem}
         ListHeaderComponent={renderListHeader}
         ListEmptyComponent={
-          !loading && !refreshing && (
-            <View style={{ padding: spacing(4), alignItems: 'center', justifyContent: 'center', marginTop: spacing(2) }}>
-              <Feather name="inbox" size={48} color={colors.textSecondary} style={{ marginBottom: spacing(2), opacity: 0.5 }} />
-              <Text style={{ color: colors.textSecondary, textAlign: 'center', fontSize: typography.sizes.md }}>
-                {t('common.noJobsAvailable')}
-              </Text>
+          isCategoryLoading ? (
+            <View style={{ paddingHorizontal: spacing(2), marginTop: spacing(2) }}>
+              {[1, 2, 3].map((i) => (
+                <Animated.View key={i} entering={FadeIn.duration(300)} style={{ marginBottom: spacing(2) }}>
+                  <SkeletonJobCardSmall shimmer={false} active={false} />
+                </Animated.View>
+              ))}
             </View>
+          ) : (
+            !loading && !refreshing && (
+              <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing(4), marginTop: spacing(4) }}>
+                <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', marginBottom: spacing(2) }}>
+                  <Feather name="inbox" size={40} color={colors.textSecondary} />
+                </View>
+                <Text style={{ color: colors.text, fontSize: typography.sizes.lg, fontWeight: '700', marginBottom: spacing(1), textAlign: 'center' }}>
+                  No hay vacantes disponibles
+                </Text>
+                <Text style={{ color: colors.textSecondary, fontSize: typography.sizes.md, textAlign: 'center' }}>
+                  Intenta ajustar tus filtros o vuelve más tarde para ver nuevas oportunidades.
+                </Text>
+              </View>
+            )
           )
         }
         onScroll={scrollHandler}
@@ -532,6 +660,11 @@ export default function HomeScreen() {
             <ActivityIndicator color={colors.primary} />
           </View>
         ) : <View style={{ height: 20 }} />}
+        
+        initialNumToRender={8} 
+        maxToRenderPerBatch={5}
+        windowSize={11}
+        removeClippedSubviews={Platform.OS === 'android'}
       />
     </View>
   );

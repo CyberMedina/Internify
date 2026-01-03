@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { Text, TouchableOpacity, ViewStyle } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
 
@@ -11,7 +11,7 @@ type Props = {
   size?: 'xs' | 'sm' | 'md';
 };
 
-export default function Chip({ label, active, onPress, style, variant = 'subtle', size = 'sm' }: Props) {
+const Chip = memo(({ label, active, onPress, style, variant = 'subtle', size = 'sm' }: Props) => {
   const { colors, spacing, radius, typography } = useTheme();
   const padH = size === 'xs' ? spacing(1) : size === 'md' ? spacing(2) : spacing(1.5);
   const padV = size === 'xs' ? spacing(0.5) : size === 'md' ? spacing(1) : spacing(0.75);
@@ -54,4 +54,6 @@ export default function Chip({ label, active, onPress, style, variant = 'subtle'
       </Text>
     </TouchableOpacity>
   );
-}
+});
+
+export default Chip;

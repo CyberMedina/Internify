@@ -47,10 +47,20 @@ export const getRecentlyViewed = async (): Promise<Job[]> => {
 export const addRecentlyViewed = async (job: Job) => {
   try {
     const jobs = await getRecentlyViewed();
-    const newJobs = [job, ...jobs.filter(j => j.id !== job.id)].slice(0, 10);
+    const newJobs = [job, ...jobs.filter(j => j.id !== job.id)].slice(0, 6);
     await AsyncStorage.setItem(RECENTLY_VIEWED_KEY, JSON.stringify(newJobs));
     return newJobs;
   } catch (e) {
     return [];
   }
 };
+
+export const clearRecentlyViewed = async () => {
+  try {
+    await AsyncStorage.removeItem(RECENTLY_VIEWED_KEY);
+    return [];
+  } catch (e) {
+    return [];
+  }
+};
+

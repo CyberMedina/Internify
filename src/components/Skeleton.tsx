@@ -4,12 +4,17 @@ import { useTheme } from '../theme/ThemeContext';
 
 type WidthType = number | `${number}%` | 'auto';
 
-export default function Skeleton({ width = '100%' as WidthType, height = 16, borderRadius = 8, style, shimmer = false }: { width?: WidthType; height?: number; borderRadius?: number; style?: ViewStyle; shimmer?: boolean }) {
+export default function Skeleton({ width = '100%' as WidthType, height = 16, borderRadius = 8, style, shimmer = false, active = true }: { width?: WidthType; height?: number; borderRadius?: number; style?: ViewStyle; shimmer?: boolean; active?: boolean }) {
   const { colors, isDark } = useTheme();
   const opacity = React.useRef(new Animated.Value(0.7)).current;
   const slide = React.useRef(new Animated.Value(0)).current;
 
   React.useEffect(() => {
+    if (!active) {
+      opacity.setValue(1); // Estático sin opacidad reducida
+      return;
+    }
+
     const loops: Animated.CompositeAnimation[] = [];
     // Pulso base
     const pulse = Animated.loop(
@@ -30,14 +35,14 @@ export default function Skeleton({ width = '100%' as WidthType, height = 16, bor
       loops.push(shimmerLoop);
     }
     return () => loops.forEach(l => l.stop());
-  }, [opacity, shimmer, slide]);
+  }, [opacity, shimmer, slide, active]);
 
   const translateX = slide.interpolate({ inputRange: [0, 1], outputRange: [-60, 200] });
 
   return (
     <View style={[{ width, height, borderRadius, overflow: 'hidden', backgroundColor: colors.skeletonBase }, style]}>
-      <Animated.View style={{ ...(StyleSheet.absoluteFillObject as any), backgroundColor: colors.skeletonHighlight, opacity }} />
-      {shimmer ? (
+      <Animated.View style={{ ...(StyleSheet.absoluteFillObject as any), backgroundColor: colors.skeletonHighlight, opacity: active ? opacity : 1 }} />
+      {shimmer && active ? (
         <Animated.View
           style={{
             position: 'absolute',

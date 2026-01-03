@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { Image, View, Text } from 'react-native';
 
 type Props = { avatars: string[]; max?: number };
-export default function AvatarGroup({ avatars, max = 4 }: Props) {
+const AvatarGroup = memo(({ avatars, max = 4 }: Props) => {
   const visible = avatars.slice(0, max);
   const extra = avatars.length - visible.length;
   return (
@@ -21,4 +21,6 @@ export default function AvatarGroup({ avatars, max = 4 }: Props) {
       )}
     </View>
   );
-}
+});
+
+export default AvatarGroup;

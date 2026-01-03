@@ -139,27 +139,12 @@ export default function MyApplicationsScreen() {
       <View style={{ 
         height: 56,
         paddingHorizontal: spacing(2), 
-        flexDirection: 'row', 
         alignItems: 'center', 
-        justifyContent: 'space-between' 
+        justifyContent: 'center' 
       }}>
-        <TouchableOpacity 
-          onPress={() => (navigation as any).goBack()} 
-          style={{ 
-            width: 40, 
-            height: 40, 
-            borderRadius: 20, 
-            backgroundColor: colors.surface, 
-            alignItems: 'center', 
-            justifyContent: 'center' 
-          }}
-        >
-          <Feather name="arrow-left" size={18} color={colors.text} />
-        </TouchableOpacity>
         <Text style={{ color: colors.text, fontWeight: '700', fontSize: typography.sizes.lg }}>
           {t('applications.title')}
         </Text>
-        <View style={{ width: 40 }} /> 
       </View>
 
       {loading ? (
@@ -171,13 +156,21 @@ export default function MyApplicationsScreen() {
           data={applications}
           renderItem={renderItem}
           keyExtractor={(item) => item.id.toString()}
-          contentContainerStyle={{ paddingBottom: 20, paddingTop: 10 }}
+          contentContainerStyle={{ paddingBottom: 20, paddingTop: 10, flexGrow: 1 }}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
           ListEmptyComponent={
-            <View style={{ alignItems: 'center', marginTop: 50 }}>
-              <Text style={{ color: colors.textSecondary }}>No tienes postulaciones aún.</Text>
+            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing(4) }}>
+              <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', marginBottom: spacing(2) }}>
+                <Feather name="briefcase" size={40} color={colors.textSecondary} />
+              </View>
+              <Text style={{ color: colors.text, fontSize: typography.sizes.lg, fontWeight: '700', marginBottom: spacing(1), textAlign: 'center' }}>
+                No tienes postulaciones
+              </Text>
+              <Text style={{ color: colors.textSecondary, fontSize: typography.sizes.md, textAlign: 'center' }}>
+                Aquí verás el estado de tus aplicaciones a las vacantes que te interesen.
+              </Text>
             </View>
           }
         />

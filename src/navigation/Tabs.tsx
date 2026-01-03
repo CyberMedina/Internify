@@ -1,7 +1,6 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import HomeStack from './HomeStack';
-import SearchScreen from '../screens/SearchScreen';
 import SavedScreen from '../screens/SavedScreen';
 import { View, Text } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
@@ -43,7 +42,7 @@ export default function Tabs() {
         component={HomeStack}
         options={({ route }) => {
           const routeName = getFocusedRouteNameFromRoute(route) ?? 'HomeMain';
-          const hideTab = routeName === 'ApplicationSuccess' || routeName === 'ProfileMain' || routeName === 'MyApplications' || routeName === 'MyProfile' || routeName === 'ApplicationStatus';
+          const hideTab = routeName === 'ApplicationSuccess' || routeName === 'ProfileMain' || routeName === 'MyApplications' || routeName === 'MyProfile' || routeName === 'ApplicationStatus' || routeName === 'Notifications';
           return {
             tabBarIcon: ({ color, size }) => <Feather name="home" size={size} color={color} />,
             tabBarStyle: hideTab
@@ -53,11 +52,6 @@ export default function Tabs() {
         }}
       />
       <Tab.Screen
-        name={t('tabs.search')}
-        component={SearchScreen}
-        options={{ tabBarIcon: ({ color, size }) => <Feather name="search" size={size} color={color} /> }}
-      />
-            <Tab.Screen
         name="MyApplications"
         component={MyApplicationsScreen}
         options={{ 

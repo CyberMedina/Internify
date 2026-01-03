@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { View, Text, TouchableOpacity, Image } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
 import Chip from './Chip';
@@ -24,7 +24,7 @@ export type Job = {
 
 type Props = { job: Job };
 
-export default function JobCardLarge({ job }: Props) {
+const JobCardLarge = memo(({ job }: Props) => {
   const { colors, spacing, radius, typography } = useTheme();
   const navigation = useNavigation<any>();
   const savedCtx = useSaved();
@@ -116,4 +116,6 @@ export default function JobCardLarge({ job }: Props) {
       </View>
     </TouchableOpacity>
   );
-}
+});
+
+export default JobCardLarge;

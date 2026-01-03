@@ -7,7 +7,7 @@ import { Feather } from '@expo/vector-icons';
 import ScreenContainer from '../components/ScreenContainer';
 import { useI18n } from '../i18n/i18n';
 import { useAuth } from '../context/AuthContext';
-import { currentUser, internshipLevels } from '../mock/user';
+import { internshipLevels } from '../mock/user';
 import LevelAvatar from '../components/LevelAvatar';
 
 const Row: React.FC<{ label: string; icon: keyof typeof Feather.glyphMap; onPress?: () => void }> = ({ label, icon, onPress }) => {
@@ -53,7 +53,7 @@ export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const { t } = useI18n();
-  const { logout } = useAuth();
+  const { logout, studentProfile } = useAuth();
 
   const canNavigateBackRef = React.useRef<boolean | null>(null);
 
@@ -82,7 +82,12 @@ export default function ProfileScreen() {
     };
   };
 
-  const status = getInternshipStatus(currentUser.hours);
+  const currentHours = 0; // Usar horas reales si están disponibles en studentProfile
+  const status = getInternshipStatus(currentHours);
+  
+  const displayName = studentProfile?.profile 
+    ? `${studentProfile.profile.first_name} ${studentProfile.profile.last_name}`
+    : 'Estudiante';
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.card }}>
@@ -128,13 +133,13 @@ export default function ProfileScreen() {
               size={56} 
               color={status.color}
               badgeContent={status.badge}
-              imageUri={currentUser.avatar || undefined}
+              imageUri={studentProfile?.profile?.photo || undefined}
             />
           </View>
 
           {/* Name + link */}
           <View style={{ flex: 1 }}>
-            <Text style={{ color: '#fff', fontWeight: '700', fontSize: typography.sizes.lg }}>{`${currentUser.names} ${currentUser.lastnames}`}</Text>
+            <Text style={{ color: '#fff', fontWeight: '700', fontSize: typography.sizes.lg }}>{displayName}</Text>
             <Text style={{ color: '#E0E7FF', marginTop: 2, fontSize: typography.sizes.sm }}>{status.stage}</Text>
             <TouchableOpacity 
               style={{ marginTop: 4 }}
@@ -155,22 +160,16 @@ export default function ProfileScreen() {
               {Math.round(status.progress * 100)}%
             </Text>
             <Text style={{ color: '#ffffffaa', fontSize: typography.sizes.xs }}>
-              {currentUser.hours} / {status.nextGoal}h
+              {currentHours} / {status.nextGoal}h
             </Text>
           </View>
         </View>
 
         {/* Menu list (single continuous block) */}
         <View style={{ marginTop: spacing(2), backgroundColor: colors.surface }}>
-          <Row label={t('profile.personalInfo')} icon="user" />
-          <Row label={t('profile.analytics')} icon="bar-chart-2" />
-          <Row label={t('profile.myApplications')} icon="file-text" onPress={() => (navigation as any).navigate('MyApplications')} />
-          <Row label={t('profile.seekingStatus')} icon="target" />
           <Row label={t('profile.settings')} icon="settings" />
-          <Row label={t('profile.language')} icon="globe" />
-          <Row label={t('profile.helpCenter')} icon="help-circle" />
           <Row label={t('profile.privacyPolicy')} icon="shield" />
-          <Row label={t('profile.inviteFriends')} icon="users" />
+          <Row label={t('profile.helpCenter')} icon="help-circle" />
         </View>
           
         <View style={{ marginTop: spacing(2), backgroundColor: colors.surface }}>

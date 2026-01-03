@@ -7,7 +7,7 @@ import JobCardSmall from '../components/JobCardSmall';
 import { useSaved } from '../context/SavedContext';
 import { useNavigation } from '@react-navigation/native';
 import type { Job } from '../components/JobCardLarge';
-import SavedSkeleton from './SavedSkeleton';
+import ScreenContainer from '../components/ScreenContainer';
 
 const SAVED: Job[] = [
   {
@@ -47,40 +47,42 @@ export default function SavedScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const savedCtx = useSaved();
-  const saved = savedCtx?.list ?? SAVED; // fallback al mock si aún no hay contexto
-  const [loading, setLoading] = React.useState(true);
-
-  React.useEffect(() => {
-    const timer = setTimeout(() => setLoading(false), 2000);
-    return () => clearTimeout(timer);
-  }, []);
-
-  if (loading) return <SavedSkeleton />;
+  const saved = savedCtx?.list ?? []; // Default to empty array if no context or mock data needed
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.card }}>
+    <ScreenContainer safeTop>
       {/* Header */}
-      <View style={{ paddingTop: insets.top + spacing(1), paddingHorizontal: spacing(2), paddingBottom: spacing(1), flexDirection: 'row', alignItems: 'center' }}>
-        <TouchableOpacity
-          onPress={() => {
-            if (navigation.canGoBack()) navigation.goBack();
-            else navigation.getParent()?.navigate('Inicio');
-          }}
-          style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' }}>
-          <Feather name="arrow-left" size={18} color={colors.text} />
-        </TouchableOpacity>
-        <Text style={{ marginLeft: spacing(2), color: colors.text, fontWeight: '700', fontSize: typography.sizes.lg }}>Guardados</Text>
+      <View style={{ 
+        height: 56,
+        paddingHorizontal: spacing(2), 
+        alignItems: 'center', 
+        justifyContent: 'center' 
+      }}>
+        <Text style={{ color: colors.text, fontWeight: '700', fontSize: typography.sizes.lg }}>Guardados</Text>
       </View>
 
       <FlatList
         data={saved}
         keyExtractor={(it) => it.id}
-        contentContainerStyle={{ paddingHorizontal: spacing(2), paddingBottom: insets.bottom + spacing(2) }}
+        contentContainerStyle={{ paddingHorizontal: spacing(2), paddingBottom: insets.bottom + spacing(2), flexGrow: 1 }}
         ItemSeparatorComponent={() => <View style={{ height: spacing(1) }} />}
         renderItem={({ item }) => (
           <JobCardSmall job={item} applicantsLabel="Postulantes" />
         )}
+        ListEmptyComponent={
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing(4) }}>
+            <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', marginBottom: spacing(2) }}>
+              <Feather name="bookmark" size={40} color={colors.textSecondary} />
+            </View>
+            <Text style={{ color: colors.text, fontSize: typography.sizes.lg, fontWeight: '700', marginBottom: spacing(1), textAlign: 'center' }}>
+              No tienes trabajos guardados
+            </Text>
+            <Text style={{ color: colors.textSecondary, fontSize: typography.sizes.md, textAlign: 'center' }}>
+              Los trabajos que guardes aparecerán aquí para que puedas acceder a ellos fácilmente.
+            </Text>
+          </View>
+        }
       />
-    </View>
+    </ScreenContainer>
   );
 }
