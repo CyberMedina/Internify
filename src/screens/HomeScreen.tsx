@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useState, useMemo } from 'react';
-import { View, Text, ScrollView, TextInput, TouchableOpacity, FlatList, ActivityIndicator, Platform, LayoutAnimation, UIManager } from 'react-native';
+import { View, Text, ScrollView, TextInput, TouchableOpacity, ActivityIndicator, Platform, LayoutAnimation, UIManager } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../theme/ThemeContext';
 import { Feather } from '@expo/vector-icons';
+import { FlashList } from '@shopify/flash-list';
 import Animated, { 
   useSharedValue, 
   useAnimatedStyle, 
@@ -34,6 +35,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
 import { getSuggestedVacancies, getCategories, getVacancies } from '../services/vacancyService';
 import { Vacancy, Category } from '../types/vacancy';
+
+const AnimatedFlashList = Animated.createAnimatedComponent(FlashList);
 
 const mapVacancyToJob = (v: Vacancy): Job => ({
   id: v.id.toString(),
@@ -287,6 +290,9 @@ export default function HomeScreen() {
 
   const handleCategoryPress = (catId: number | null) => {
     if (activeCatId === catId) return;
+    
+    // Reset header animation
+    scrollY.value = 0;
     
     // LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut); // Eliminamos LayoutAnimation para usar Reanimated
     setActiveCatId(catId);
@@ -614,11 +620,12 @@ export default function HomeScreen() {
       </View>
 
       {/* Contenido Scrolleable */}
-      <Animated.FlatList
+      <AnimatedFlashList
         key={activeCatId ? activeCatId.toString() : 'all'}
         data={recent}
         keyExtractor={keyExtractor}
         renderItem={renderItem}
+        estimatedItemSize={150}
         ListHeaderComponent={renderListHeader}
         ListEmptyComponent={
           isCategoryLoading ? (
@@ -660,11 +667,6 @@ export default function HomeScreen() {
             <ActivityIndicator color={colors.primary} />
           </View>
         ) : <View style={{ height: 20 }} />}
-        
-        initialNumToRender={8} 
-        maxToRenderPerBatch={5}
-        windowSize={11}
-        removeClippedSubviews={Platform.OS === 'android'}
       />
     </View>
   );
