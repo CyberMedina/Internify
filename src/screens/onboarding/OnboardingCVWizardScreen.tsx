@@ -14,6 +14,8 @@ import { currentUser } from '../../mock/user';
 import { useAuth } from '../../context/AuthContext';
 import { skillService, Skill } from '../../services/skillService';
 import SkeletonChip from '../../components/skeletons/SkeletonChip';
+import ExperienceModal, { Experience } from '../../components/profile/modals/ExperienceModal';
+import CertificationModal, { Certification } from '../../components/profile/modals/CertificationModal';
 
 type Props = NativeStackScreenProps<OnboardingStackParamList, 'CVWizard'>;
 
@@ -346,36 +348,20 @@ export default function OnboardingCVWizardScreen({ navigation, route }: Props) {
     Alert.alert('Copiado', 'El JSON ha sido copiado al portapapeles.');
   };
 
-  const handleSaveExperience = () => {
-    const errors: any = {};
-    if (!newExperience.title.trim()) errors.title = 'El cargo es requerido';
-    if (!newExperience.company.trim()) errors.company = 'La empresa es requerida';
+  const handleSaveExperience = (experienceData: Experience) => {
     
-    if (!newExperience.startMonth || !newExperience.startYear) {
-      errors.startDate = 'Fecha de inicio incompleta';
-    }
-    
-    if (!newExperience.isCurrent && (!newExperience.endMonth || !newExperience.endYear)) {
-      errors.endDate = 'Fecha de fin incompleta';
-    }
-
-    if (Object.keys(errors).length > 0) {
-      setExperienceErrors(errors);
-      return;
-    }
-
-    const startDate = `${newExperience.startMonth}/${newExperience.startYear}`;
-    const endDate = newExperience.isCurrent ? 'Presente' : `${newExperience.endMonth}/${newExperience.endYear}`;
+    const startDate = `${experienceData.startMonth}/${experienceData.startYear}`;
+    const endDate = experienceData.isCurrent ? 'Presente' : `${experienceData.endMonth}/${experienceData.endYear}`;
 
     // Generate ISO dates for backend
-    const startMonthInt = parseInt(newExperience.startMonth, 10);
-    const startYearInt = parseInt(newExperience.startYear, 10);
+    const startMonthInt = parseInt(experienceData.startMonth, 10);
+    const startYearInt = parseInt(experienceData.startYear, 10);
     const startDateISO = new Date(startYearInt, startMonthInt - 1, 1).toISOString();
     
     let endDateISO = null;
-    if (!newExperience.isCurrent && newExperience.endMonth && newExperience.endYear) {
-        const endMonthInt = parseInt(newExperience.endMonth, 10);
-        const endYearInt = parseInt(newExperience.endYear, 10);
+    if (!experienceData.isCurrent && experienceData.endMonth && experienceData.endYear) {
+        const endMonthInt = parseInt(experienceData.endMonth, 10);
+        const endYearInt = parseInt(experienceData.endYear, 10);
         endDateISO = new Date(endYearInt, endMonthInt - 1, 1).toISOString();
     }
 
@@ -383,15 +369,15 @@ export default function OnboardingCVWizardScreen({ navigation, route }: Props) {
         // Update existing experience
         setExperiences(experiences.map(exp => exp.id === editingExperienceId ? {
             ...exp,
-            ...newExperience,
-            dates: `${startDate} - ${endDate}`,
+            ...experienceData, // Use the data from the modal
+            dates: `${startDate} - ${endDate}`, // Update formatted dates
             startDateISO,
             endDateISO
         } : exp));
     } else {
         // Add new experience
         setExperiences([...experiences, { 
-            ...newExperience, 
+            ...experienceData, 
             dates: `${startDate} - ${endDate}`,
             startDateISO,
             endDateISO,
@@ -399,18 +385,7 @@ export default function OnboardingCVWizardScreen({ navigation, route }: Props) {
         }]);
     }
     
-    setNewExperience({
-      title: '',
-      company: '',
-      startMonth: '',
-      startYear: '',
-      endMonth: '',
-      endYear: '',
-      isCurrent: false,
-      description: ''
-    });
     setEditingExperienceId(null);
-    setExperienceErrors({});
     setExperienceModalVisible(false);
   };
 
@@ -429,53 +404,36 @@ export default function OnboardingCVWizardScreen({ navigation, route }: Props) {
     );
   };
 
-  const handleSaveCertification = () => {
-    const errors: any = {};
-    if (!newCert.name.trim()) errors.name = 'El nombre es requerido';
-    if (!newCert.organization.trim()) errors.organization = 'La institución es requerida';
+  const handleSaveCertification = (certData: Certification) => {
     
-    if (!newCert.startMonth || !newCert.startYear) {
-      errors.startDate = 'Fecha de inicio incompleta';
-    }
-    if (!newCert.endMonth || !newCert.endYear) {
-      errors.endDate = 'Fecha de fin incompleta';
-    }
-
-    if (Object.keys(errors).length > 0) {
-      setCertErrors(errors);
-      return;
-    }
-
     // Generate ISO dates for backend
-    const startMonthInt = parseInt(newCert.startMonth, 10);
-    const startYearInt = parseInt(newCert.startYear, 10);
+    const startMonthInt = parseInt(certData.startMonth, 10);
+    const startYearInt = parseInt(certData.startYear, 10);
     const startDateISO = new Date(startYearInt, startMonthInt - 1, 1).toISOString();
     
-    const endMonthInt = parseInt(newCert.endMonth, 10);
-    const endYearInt = parseInt(newCert.endYear, 10);
+    const endMonthInt = parseInt(certData.endMonth, 10);
+    const endYearInt = parseInt(certData.endYear, 10);
     const endDateISO = new Date(endYearInt, endMonthInt - 1, 1).toISOString();
 
     if (editingCertId !== null) {
         // Update existing certification
         setCertifications(certifications.map(cert => cert.id === editingCertId ? {
             ...cert,
-            ...newCert,
+            ...certData,
             startDateISO,
             endDateISO
         } : cert));
     } else {
         // Add new certification
         setCertifications([...certifications, { 
-            ...newCert, 
+            ...certData, 
             startDateISO,
             endDateISO,
             id: Date.now() 
         }]);
     }
 
-    setNewCert({ name: '', organization: '', startMonth: '', startYear: '', endMonth: '', endYear: '' });
     setEditingCertId(null);
-    setCertErrors({});
     setCertModalVisible(false);
   };
 
@@ -993,207 +951,11 @@ export default function OnboardingCVWizardScreen({ navigation, route }: Props) {
     </View>
   );
 
-  const renderExperienceModal = () => (
-    <Modal
-      animationType="slide"
-      transparent={true}
-      visible={experienceModalVisible}
-      onRequestClose={() => setExperienceModalVisible(false)}
-    >
-      <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.modalOverlay}
-      >
-        <View style={[styles.modalContent, { backgroundColor: colors.card, maxHeight: '90%' }]}>
-          <Text style={[styles.modalTitle, { color: colors.text }]}>
-            {editingExperienceId !== null ? 'Editar Experiencia' : 'Nueva Experiencia'}
-          </Text>
-          
-          <ScrollView showsVerticalScrollIndicator={false}>
-            <View style={{ marginBottom: 12 }}>
-                <TextInput
-                ref={expCompanyRef}
-                style={[styles.input, { color: colors.text, borderColor: experienceErrors.company ? 'red' : colors.border }]}
-                placeholder="Empresa / Organización"
-                placeholderTextColor={colors.textSecondary}
-                value={newExperience.company}
-                onChangeText={(text) => setNewExperience({...newExperience, company: text})}
-                returnKeyType="next"
-                onSubmitEditing={() => expTitleRef.current?.focus()}
-                blurOnSubmit={false}
-                />
-                {experienceErrors.company && <Text style={styles.errorText}>{experienceErrors.company}</Text>}
-            </View>
 
-            <View style={{ marginBottom: 12 }}>
-                <TextInput
-                ref={expTitleRef}
-                style={[styles.input, { color: colors.text, borderColor: experienceErrors.title ? 'red' : colors.border }]}
-                placeholder="Cargo / Título"
-                placeholderTextColor={colors.textSecondary}
-                value={newExperience.title}
-                onChangeText={(text) => setNewExperience({...newExperience, title: text})}
-                returnKeyType="next"
-                onSubmitEditing={() => expStartMonthRef.current?.focus()}
-                blurOnSubmit={false}
-                />
-                {experienceErrors.title && <Text style={styles.errorText}>{experienceErrors.title}</Text>}
-            </View>
-            
-            <MonthYearPicker
-              label="FECHA DE INICIO"
-              selectedMonth={newExperience.startMonth}
-              selectedYear={newExperience.startYear}
-              onMonthChange={(val) => setNewExperience({...newExperience, startMonth: val})}
-              onYearChange={(val) => setNewExperience({...newExperience, startYear: val})}
-              error={experienceErrors.startDate}
-            />
 
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                <Text style={{ color: colors.text }}>¿Trabajo actual?</Text>
-                <Switch
-                value={newExperience.isCurrent}
-                onValueChange={(val) => setNewExperience({...newExperience, isCurrent: val})}
-                trackColor={{ false: colors.border, true: colors.primary }}
-                />
-            </View>
 
-            {!newExperience.isCurrent && (
-                <MonthYearPicker
-                  label="FECHA DE FIN"
-                  selectedMonth={newExperience.endMonth}
-                  selectedYear={newExperience.endYear}
-                  onMonthChange={(val) => setNewExperience({...newExperience, endMonth: val})}
-                  onYearChange={(val) => setNewExperience({...newExperience, endYear: val})}
-                  error={experienceErrors.endDate}
-                />
-            )}
-            
-            <TextInput
-                ref={expDescriptionRef}
-                style={[styles.input, { color: colors.text, borderColor: colors.border, marginBottom: 24, height: 100, textAlignVertical: 'top' }]}
-                placeholder="Descripción de responsabilidades..."
-                placeholderTextColor={colors.textSecondary}
-                multiline
-                numberOfLines={4}
-                value={newExperience.description}
-                onChangeText={(text) => setNewExperience({...newExperience, description: text})}
-            />
 
-            <View style={styles.modalButtons}>
-                <TouchableOpacity 
-                style={[styles.modalButton, { backgroundColor: colors.border }]} 
-                onPress={() => {
-                    setExperienceErrors({});
-                    setEditingExperienceId(null);
-                    setExperienceModalVisible(false);
-                }}
-                >
-                <Text style={{ color: colors.text }}>Cancelar</Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity 
-                style={[styles.modalButton, { backgroundColor: colors.primary }]} 
-                onPress={handleSaveExperience}
-                >
-                <Text style={{ color: '#FFF', fontWeight: 'bold' }}>Guardar</Text>
-                </TouchableOpacity>
-            </View>
-          </ScrollView>
-        </View>
-      </KeyboardAvoidingView>
-    </Modal>
-  );
 
-  const renderCertModal = () => (
-    <Modal
-      animationType="slide"
-      transparent={true}
-      visible={certModalVisible}
-      onRequestClose={() => setCertModalVisible(false)}
-    >
-      <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.modalOverlay}
-      >
-        <View style={[styles.modalContent, { backgroundColor: colors.card, maxHeight: '90%' }]}>
-          <Text style={[styles.modalTitle, { color: colors.text }]}>
-            {editingCertId !== null ? 'Editar Certificación' : 'Nueva Certificación'}
-          </Text>
-          
-          <ScrollView showsVerticalScrollIndicator={false}>
-            <View style={{ marginBottom: 12 }}>
-                <TextInput
-                ref={certNameRef}
-                style={[styles.input, { color: colors.text, borderColor: certErrors.name ? 'red' : colors.border }]}
-                placeholder="Nombre del Curso / Certificación"
-                placeholderTextColor={colors.textSecondary}
-                value={newCert.name}
-                onChangeText={(text) => setNewCert({...newCert, name: text})}
-                returnKeyType="next"
-                onSubmitEditing={() => certOrgRef.current?.focus()}
-                blurOnSubmit={false}
-                />
-                {certErrors.name && <Text style={styles.errorText}>{certErrors.name}</Text>}
-            </View>
-            
-            <View style={{ marginBottom: 12 }}>
-                <TextInput
-                ref={certOrgRef}
-                style={[styles.input, { color: colors.text, borderColor: certErrors.organization ? 'red' : colors.border }]}
-                placeholder="Institución / Plataforma"
-                placeholderTextColor={colors.textSecondary}
-                value={newCert.organization}
-                onChangeText={(text) => setNewCert({...newCert, organization: text})}
-                returnKeyType="next"
-                onSubmitEditing={() => certStartMonthRef.current?.focus()}
-                blurOnSubmit={false}
-                />
-                {certErrors.organization && <Text style={styles.errorText}>{certErrors.organization}</Text>}
-            </View>
-            
-            <MonthYearPicker
-              label="FECHA DE INICIO"
-              selectedMonth={newCert.startMonth}
-              selectedYear={newCert.startYear}
-              onMonthChange={(val) => setNewCert({...newCert, startMonth: val})}
-              onYearChange={(val) => setNewCert({...newCert, startYear: val})}
-              error={certErrors.startDate}
-            />
-
-            <MonthYearPicker
-              label="FECHA DE FIN"
-              selectedMonth={newCert.endMonth}
-              selectedYear={newCert.endYear}
-              onMonthChange={(val) => setNewCert({...newCert, endMonth: val})}
-              onYearChange={(val) => setNewCert({...newCert, endYear: val})}
-              error={certErrors.endDate}
-            />
-
-            <View style={styles.modalButtons}>
-                <TouchableOpacity 
-                style={[styles.modalButton, { backgroundColor: colors.border }]} 
-                onPress={() => {
-                    setCertErrors({});
-                    setEditingCertId(null);
-                    setCertModalVisible(false);
-                }}
-                >
-                <Text style={{ color: colors.text }}>Cancelar</Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity 
-                style={[styles.modalButton, { backgroundColor: colors.primary }]} 
-                onPress={handleSaveCertification}
-                >
-                <Text style={{ color: '#FFF', fontWeight: 'bold' }}>Guardar</Text>
-                </TouchableOpacity>
-            </View>
-          </ScrollView>
-        </View>
-      </KeyboardAvoidingView>
-    </Modal>
-  );
 
   const renderLanguageModal = () => (
     <Modal
@@ -1442,8 +1204,18 @@ export default function OnboardingCVWizardScreen({ navigation, route }: Props) {
 
   return (
     <ScreenContainer safeTop safeBottom style={styles.container}>
-      {renderExperienceModal()}
-      {renderCertModal()}
+      <ExperienceModal
+        visible={experienceModalVisible}
+        onClose={() => setExperienceModalVisible(false)}
+        onSave={handleSaveExperience}
+        initialData={editingExperienceId !== null ? newExperience : null}
+      />
+      <CertificationModal
+        visible={certModalVisible}
+        onClose={() => setCertModalVisible(false)}
+        onSave={handleSaveCertification}
+        initialData={editingCertId !== null ? newCert : null}
+      />
       {renderLanguageModal()}
       {renderTitleModal()}
       {renderValidationModal()}

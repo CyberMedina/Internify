@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, RefreshControl, Linking, Dimensions, Image, Platform, Animated } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, RefreshControl, Linking, Dimensions, Image, Platform, Animated, Alert } from 'react-native';
 import { api } from '../services/api';
 import { useTheme } from '../theme/ThemeContext';
 import { useAuth } from '../context/AuthContext';
@@ -10,6 +10,12 @@ import { currentUser, internshipLevels } from '../mock/user';
 import { StudentProfile } from '../types/auth'; 
 import LevelAvatar from '../components/LevelAvatar'; 
 import { LinearGradient } from 'expo-linear-gradient'; 
+import ExperienceModal, { Experience as ModalExperience } from '../components/profile/modals/ExperienceModal';
+import CertificationModal, { Certification as ModalCertification } from '../components/profile/modals/CertificationModal';
+import EducationModal, { Education as ModalEducation } from '../components/profile/modals/EducationModal';
+import { SkillsEditModal } from '../components/profile/modals/SkillsEditModal';
+import LanguageModal, { Language as ModalLanguage } from '../components/profile/modals/LanguageModal';
+import SummaryModal from '../components/profile/modals/SummaryModal';
 
 interface Certification {
   id: number;
@@ -83,11 +89,456 @@ export default function MyProfileScreen() {
   
   const scrollY = useRef(new Animated.Value(0)).current;
 
+  // Edit Modals State
+  const [experienceModalVisible, setExperienceModalVisible] = useState(false);
+  const [selectedExperience, setSelectedExperience] = useState<ModalExperience | null>(null);
+
+  // Cert Modal State
+  const [certModalVisible, setCertModalVisible] = useState(false);
+  const [selectedCert, setSelectedCert] = useState<ModalCertification | null>(null);
+
+  // Education Modal State
+  const [eduModalVisible, setEduModalVisible] = useState(false);
+  const [selectedEdu, setSelectedEdu] = useState<ModalEducation | null>(null);
+
+  // Skills Modal State
+  const [skillsModalVisible, setSkillsModalVisible] = useState(false);
+
+  // Language Modal State
+  const [langModalVisible, setLangModalVisible] = useState(false);
+  const [selectedLang, setSelectedLang] = useState<ModalLanguage | null>(null);
+
+  // Summary Modal State
+  const [summaryModalVisible, setSummaryModalVisible] = useState(false);
+
+  // Skills Handlers
+  const handleOpenSkillsModal = () => {
+    setSkillsModalVisible(true);
+  };
+
+  const handleSaveSkills = async (newSkills: string[]) => {
+      if (!cvData) return;
+      setLoading(true);
+      try {
+          const dataToSend = {
+              summary: cvData.summary,
+              education: cvData.education.map(edu => ({
+                institution: edu.institution,
+                title: edu.degree,
+                start_year: edu.start_year,
+                end_year: edu.end_year
+              })),
+              experiences: cvData.experiences.map(exp => ({
+                  title: exp.position,
+                  company: exp.company_name,
+                  start_month: exp.start_month,
+                  start_year: exp.start_year,
+                  end_month: exp.end_month,
+                  end_year: exp.end_year,
+                  is_current: !exp.end_year && !exp.end_month,
+                  description: exp.description
+              })),
+              certifications: cvData.certifications.map(cert => ({
+                  title: cert.title,
+                  institution: cert.institution,
+                  start_year: cert.start_year,
+                  end_year: cert.end_year,
+                  credential_url: cert.credential_url
+              })),
+              skills: newSkills.map(s => ({ skill_name: s })),
+              languages: cvData.languages.map(l => ({ language: l.language, level: l.level }))
+          };
+
+          await api.post('/student/cv', dataToSend, { token: userToken || undefined });
+          await fetchCV();
+          setSkillsModalVisible(false);
+      } catch (error) {
+          console.error("Error saving skills", error);
+      } finally {
+          setLoading(false);
+      }
+  };
+
+  // Language Handlers
+  const handleOpenLangModal = (lang?: Language) => {
+      if (lang) {
+          setSelectedLang({
+              id: lang.id,
+              language: lang.language,
+              level: lang.level
+          });
+      } else {
+          setSelectedLang(null);
+      }
+      setLangModalVisible(true);
+  };
+
+  const handleSaveLanguage = async (modalLang: ModalLanguage) => {
+      if (!cvData) return;
+      setLoading(true);
+      try {
+          let updatedLangs = [...cvData.languages];
+          if (modalLang.id) {
+               updatedLangs = updatedLangs.map(l => l.id === modalLang.id ? {
+                   ...l,
+                   language: modalLang.language,
+                   level: modalLang.level
+               } : l);
+          } else {
+               updatedLangs.push({
+                   id: Date.now(),
+                   language: modalLang.language,
+                   level: modalLang.level
+               });
+          }
+
+          const dataToSend = {
+              summary: cvData.summary,
+              education: cvData.education.map(edu => ({
+                institution: edu.institution,
+                title: edu.degree,
+                start_year: edu.start_year,
+                end_year: edu.end_year
+              })),
+              experiences: cvData.experiences.map(exp => ({
+                  title: exp.position,
+                  company: exp.company_name,
+                  start_month: exp.start_month,
+                  start_year: exp.start_year,
+                  end_month: exp.end_month,
+                  end_year: exp.end_year,
+                  is_current: !exp.end_year && !exp.end_month,
+                  description: exp.description
+              })),
+              certifications: cvData.certifications.map(cert => ({
+                  title: cert.title,
+                  institution: cert.institution,
+                  start_year: cert.start_year,
+                  end_year: cert.end_year,
+                  credential_url: cert.credential_url
+              })),
+              skills: cvData.skills.map(s => ({ skill_name: s.skill_name })),
+              languages: updatedLangs.map(l => ({ language: l.language, level: l.level }))
+          };
+
+          await api.post('/student/cv', dataToSend, { token: userToken || undefined });
+          await fetchCV();
+          setLangModalVisible(false);
+      } catch (error) {
+          console.error("Error saving language", error);
+      } finally {
+          setLoading(false);
+      }
+  };
+
+  // Summary Handler
+  const handleSaveSummary = async (newSummary: string) => {
+      if (!cvData) return;
+      setLoading(true);
+      try {
+          const dataToSend = {
+              summary: newSummary,
+              education: cvData.education.map(edu => ({
+                institution: edu.institution,
+                title: edu.degree,
+                start_year: edu.start_year,
+                end_year: edu.end_year
+              })),
+              experiences: cvData.experiences.map(exp => ({
+                  title: exp.position,
+                  company: exp.company_name,
+                  start_month: exp.start_month,
+                  start_year: exp.start_year,
+                  end_month: exp.end_month,
+                  end_year: exp.end_year,
+                  is_current: !exp.end_year && !exp.end_month,
+                  description: exp.description
+              })),
+              certifications: cvData.certifications.map(cert => ({
+                  title: cert.title,
+                  institution: cert.institution,
+                  start_year: cert.start_year,
+                  end_year: cert.end_year,
+                  credential_url: cert.credential_url
+              })),
+              skills: cvData.skills.map(s => ({ skill_name: s.skill_name })),
+              languages: cvData.languages.map(l => ({ language: l.language, level: l.level }))
+          };
+
+          await api.post('/student/cv', dataToSend, { token: userToken || undefined });
+          await fetchCV();
+          setSummaryModalVisible(false);
+      } catch (error) {
+          console.error("Error saving summary", error);
+      } finally {
+          setLoading(false);
+      }
+  };
+
+  // Experience Handlers
+  const handleOpenExperienceModal = (exp?: Experience) => {
+    if (exp) {
+      setSelectedExperience({
+        id: exp.id,
+        title: exp.position,
+        company: exp.company_name,
+        startMonth: exp.start_month || '',
+        startYear: exp.start_year || '',
+        endMonth: exp.end_month,
+        endYear: exp.end_year,
+        isCurrent: !exp.end_year && !exp.end_month, 
+        description: exp.description || ''
+      });
+    } else {
+      setSelectedExperience(null);
+    }
+    setExperienceModalVisible(true);
+  };
+
+  const handleSaveExperience = async (modalExp: ModalExperience) => {
+    if (!cvData) return;
+
+    // Optimistic update or waiting? Waiting is safer for syncing.
+    // We'll reuse 'loading' or add a specific saving state?
+    // Using loading will trigger the full screen loader which might be too much.
+    // But for now it ensures safety.
+    setLoading(true); 
+    
+    try {
+      let updatedExperiences = [...cvData.experiences];
+      
+      if (modalExp.id) {
+         // Edit
+         updatedExperiences = updatedExperiences.map(e => e.id === modalExp.id ? {
+            ...e,
+            position: modalExp.title,
+            company_name: modalExp.company,
+            start_month: modalExp.startMonth,
+            start_year: modalExp.startYear,
+            end_month: modalExp.endMonth,
+            end_year: modalExp.endYear,
+            description: modalExp.description
+         } : e);
+      } else {
+         updatedExperiences.push({
+            id: Date.now(), 
+            position: modalExp.title,
+            company_name: modalExp.company,
+            start_month: modalExp.startMonth,
+            start_year: modalExp.startYear,
+            end_month: modalExp.endMonth,
+            end_year: modalExp.endYear,
+            description: modalExp.description,
+            start_date: null,
+            end_date: null
+         });
+      }
+
+      const dataToSend = {
+        summary: cvData.summary,
+        education: cvData.education.map(edu => ({
+            institution: edu.institution,
+            title: edu.degree,
+            start_year: edu.start_year,
+            end_year: edu.end_year
+        })),
+        experiences: updatedExperiences.map(exp => ({
+            title: exp.position,
+            company: exp.company_name,
+            start_month: exp.start_month,
+            start_year: exp.start_year,
+            end_month: exp.end_month,
+            end_year: exp.end_year,
+            is_current: !exp.end_year && !exp.end_month,
+            description: exp.description
+        })),
+        certifications: cvData.certifications.map(cert => ({
+            title: cert.title,
+            institution: cert.institution,
+            start_year: cert.start_year,
+            end_year: cert.end_year,
+            credential_url: cert.credential_url
+        })),
+        skills: cvData.skills.map(s => ({ skill_name: s.skill_name })),
+        languages: cvData.languages.map(l => ({ language: l.language, level: l.level }))
+      };
+
+      await api.post('/student/cv', dataToSend, { token: userToken || undefined });
+      await fetchCV();
+      setExperienceModalVisible(false);
+
+    } catch (error) {
+       console.error("Error saving experience", error);
+       // Alert.alert("Error", "No se pudo guardar."); // Assuming Alert is imported, if not I should import it 
+    } finally {
+       setLoading(false);
+    }
+  };
+
+  // Certification Handlers
+  const handleOpenCertModal = (cert?: Certification) => {
+    if (cert) {
+      setSelectedCert({
+        id: cert.id,
+        name: cert.title,
+        organization: cert.institution,
+        startMonth: '', // Backend doesn't send month separately in this interface, might need parsing or just empty
+        startYear: cert.start_year || '',
+        endMonth: '', 
+        endYear: cert.end_year || '',
+        credentialUrl: cert.credential_url || ''
+      });
+    } else {
+      setSelectedCert(null);
+    }
+    setCertModalVisible(true);
+  };
+
+  const handleSaveCert = async (modalCert: ModalCertification) => {
+    if (!cvData) return;
+    setLoading(true);
+    try {
+        let updatedCerts = [...cvData.certifications];
+        if (modalCert.id) {
+             updatedCerts = updatedCerts.map(c => c.id === modalCert.id ? {
+                 ...c,
+                 title: modalCert.name,
+                 institution: modalCert.organization,
+                 start_year: modalCert.startYear,
+                 end_year: modalCert.endYear,
+                 credential_url: modalCert.credentialUrl || null
+             } : c);
+        } else {
+            updatedCerts.push({
+                id: Date.now(),
+                title: modalCert.name,
+                institution: modalCert.organization,
+                start_year: modalCert.startYear,
+                end_year: modalCert.endYear,
+                credential_url: modalCert.credentialUrl || null
+            });
+        }
+
+        const dataToSend = {
+            summary: cvData.summary,
+            education: cvData.education,
+            experiences: cvData.experiences.map(exp => ({
+                title: exp.position,
+                company: exp.company_name,
+                start_month: exp.start_month,
+                start_year: exp.start_year,
+                end_month: exp.end_month,
+                end_year: exp.end_year,
+                is_current: !exp.end_year && !exp.end_month,
+                description: exp.description
+            })),
+            certifications: updatedCerts.map(cert => ({
+                title: cert.title,
+                institution: cert.institution,
+                start_year: cert.start_year,
+                end_year: cert.end_year,
+                credential_url: cert.credential_url
+            })),
+            skills: cvData.skills.map(s => ({ skill_name: s.skill_name })),
+            languages: cvData.languages // TODO: Add logic for languages
+        };
+
+        await api.post('/student/cv', dataToSend, { token: userToken || undefined });
+        await fetchCV();
+        setCertModalVisible(false);
+    } catch (error) {
+        console.error("Error saving certification", error);
+    } finally {
+        setLoading(false);
+    }
+  };
+
+  // Education Handlers
+  const handleOpenEduModal = (edu?: Education) => {
+    if (edu) {
+      setSelectedEdu({
+        id: edu.id,
+        institution: edu.institution,
+        degree: edu.degree,
+        startMonth: '', 
+        startYear: edu.start_year,
+        endMonth: '', 
+        endYear: edu.end_year || '',
+        isCurrent: !edu.end_year
+      });
+    } else {
+      setSelectedEdu(null);
+    }
+    setEduModalVisible(true);
+  };
+
+  const handleSaveEdu = async (modalEdu: ModalEducation) => {
+    if (!cvData) return;
+    setLoading(true);
+    try {
+        let updatedEdu = [...cvData.education];
+        if (modalEdu.id) {
+             updatedEdu = updatedEdu.map(e => e.id === modalEdu.id ? {
+                 ...e,
+                 institution: modalEdu.institution,
+                 degree: modalEdu.degree,
+                 start_year: modalEdu.startYear,
+                 end_year: modalEdu.endYear || null
+             } : e);
+        } else {
+            updatedEdu.push({
+                id: Date.now(),
+                institution: modalEdu.institution,
+                degree: modalEdu.degree,
+                start_year: modalEdu.startYear,
+                end_year: modalEdu.endYear || null
+            });
+        }
+
+        const dataToSend = {
+            summary: cvData.summary,
+            education: updatedEdu.map(e => ({
+                institution: e.institution,
+                title: e.degree,
+                start_year: e.start_year,
+                end_year: e.end_year
+            })),
+            experiences: cvData.experiences.map(exp => ({
+                title: exp.position,
+                company: exp.company_name,
+                start_month: exp.start_month,
+                start_year: exp.start_year,
+                end_month: exp.end_month,
+                end_year: exp.end_year,
+                is_current: !exp.end_year && !exp.end_month,
+                description: exp.description
+            })),
+            certifications: cvData.certifications.map(cert => ({
+                title: cert.title,
+                institution: cert.institution,
+                start_year: cert.start_year,
+                end_year: cert.end_year,
+                credential_url: cert.credential_url
+            })),
+            skills: cvData.skills.map(s => ({ skill_name: s.skill_name })),
+            languages: cvData.languages
+        };
+
+        await api.post('/student/cv', dataToSend, { token: userToken || undefined });
+        await fetchCV();
+        setEduModalVisible(false);
+    } catch (error) {
+        console.error("Error saving education", error);
+    } finally {
+        setLoading(false);
+    }
+  };
+
   const fetchCV = async () => {
     try {
       const [cvResponse, profileResponse] = await Promise.all([
-        api.get<any>('/student/cv', { token: userToken }).catch(e => null), 
-        api.get<any>('/student/profile', { token: userToken }).catch(e => null)
+        api.get<any>('/student/cv', { token: userToken || undefined }).catch(e => null), 
+        api.get<any>('/student/profile', { token: userToken || undefined }).catch(e => null)
       ]);
 
       if (cvResponse) {
@@ -249,11 +700,16 @@ export default function MyProfileScreen() {
     <View style={styles.tabContent}>
        {/* About / Summary */}
         <View style={[styles.sectionContainer, { backgroundColor: colors.surface }]}>
-            <View style={styles.sectionHeaderIcon}>
-               <View style={[styles.iconContainer, { backgroundColor: colors.primary + '15' }]}>
-                  <Feather name="user" size={18} color={colors.primary} />
-               </View>
-               <Text style={[styles.sectionTitle, { color: colors.text, marginBottom: 0 }]}>Sobre mí</Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <View style={[styles.sectionHeaderIcon, { marginBottom: 0 }]}>
+                   <View style={[styles.iconContainer, { backgroundColor: colors.primary + '15' }]}>
+                      <Feather name="user" size={18} color={colors.primary} />
+                   </View>
+                   <Text style={[styles.sectionTitle, { color: colors.text, marginBottom: 0 }]}>Sobre mí</Text>
+                </View>
+                <TouchableOpacity onPress={() => setSummaryModalVisible(true)} style={{ padding: 4 }}>
+                   <Feather name="edit-2" size={20} color={colors.primary} />
+                </TouchableOpacity>
             </View>
           <Text style={[styles.bodyText, { color: cvData?.summary ? colors.textSecondary : colors.textSecondary + '80', marginTop: 8, fontStyle: cvData?.summary ? 'normal' : 'italic' }]}>
             {cvData?.summary || "No hay descripción profesional registrada"}
@@ -262,11 +718,16 @@ export default function MyProfileScreen() {
 
        {/* Skills */}
           <View style={[styles.sectionContainer, { backgroundColor: colors.surface }]}>
-            <View style={styles.sectionHeaderIcon}>
-               <View style={[styles.iconContainer, { backgroundColor: colors.primary + '15' }]}>
-                  <Feather name="zap" size={18} color={colors.primary} />
-               </View>
-               <Text style={[styles.sectionTitle, { color: colors.text, marginBottom: 0 }]}>Habilidades</Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <View style={[styles.sectionHeaderIcon, { marginBottom: 0 }]}>
+                   <View style={[styles.iconContainer, { backgroundColor: colors.primary + '15' }]}>
+                      <Feather name="zap" size={18} color={colors.primary} />
+                   </View>
+                   <Text style={[styles.sectionTitle, { color: colors.text, marginBottom: 0 }]}>Habilidades</Text>
+                </View>
+                <TouchableOpacity onPress={handleOpenSkillsModal} style={{ padding: 4 }}>
+                   <Feather name="edit-2" size={20} color={colors.primary} />
+                </TouchableOpacity>
             </View>
             
             {cvData?.skills && cvData.skills.length > 0 ? (
@@ -287,25 +748,33 @@ export default function MyProfileScreen() {
 
       {/* Languages */}
          <View style={[styles.sectionContainer, { backgroundColor: colors.surface }]}>
-            <View style={styles.sectionHeaderIcon}>
-               <View style={[styles.iconContainer, { backgroundColor: colors.primary + '15' }]}>
-                  <Feather name="globe" size={18} color={colors.primary} />
-               </View>
-               <Text style={[styles.sectionTitle, { color: colors.text, marginBottom: 0 }]}>Idiomas</Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <View style={[styles.sectionHeaderIcon, { marginBottom: 0 }]}>
+                   <View style={[styles.iconContainer, { backgroundColor: colors.primary + '15' }]}>
+                      <Feather name="globe" size={18} color={colors.primary} />
+                   </View>
+                   <Text style={[styles.sectionTitle, { color: colors.text, marginBottom: 0 }]}>Idiomas</Text>
+                </View>
+                <TouchableOpacity onPress={() => handleOpenLangModal()} style={{ padding: 4 }}>
+                   <Feather name="plus-circle" size={20} color={colors.primary} />
+                </TouchableOpacity>
             </View>
            
            {cvData?.languages && cvData.languages.length > 0 ? (
                <View style={{ marginTop: 8 }}>
                 {cvData.languages.map((lang, index) => (
-                    <View key={lang.id} style={[styles.languageItem, { borderBottomColor: colors.border, borderBottomWidth: index === cvData.languages.length - 1 ? 0 : 1 }]}>
-                    <View style={styles.languageInfo}>
-                        <View style={[styles.languageDot, { backgroundColor: colors.text }]} />
-                        <Text style={[styles.languageName, { color: colors.text }]}>{lang.language}</Text>
-                    </View>
-                    <View style={[styles.languageLevelBadge, { backgroundColor: colors.success + '15' }]}>
-                        <Text style={[styles.languageLevelText, { color: colors.success }]}>{lang.level}</Text>
-                    </View>
-                    </View>
+                    <TouchableOpacity key={lang.id} onPress={() => handleOpenLangModal(lang)} activeOpacity={0.7} style={[styles.languageItem, { borderBottomColor: colors.border, borderBottomWidth: index === cvData.languages.length - 1 ? 0 : 1 }]}>
+                        <View style={styles.languageInfo}>
+                            <View style={[styles.languageDot, { backgroundColor: colors.text }]} />
+                            <Text style={[styles.languageName, { color: colors.text }]}>{lang.language}</Text>
+                        </View>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                            <View style={[styles.languageLevelBadge, { backgroundColor: colors.success + '15' }]}>
+                                <Text style={[styles.languageLevelText, { color: colors.success }]}>{lang.level}</Text>
+                            </View>
+                            <Feather name="edit-2" size={14} color={colors.textSecondary} />
+                        </View>
+                    </TouchableOpacity>
                 ))}
                </View>
            ) : (
@@ -315,25 +784,34 @@ export default function MyProfileScreen() {
 
        {/* Experience */}
          <View style={[styles.sectionContainer, { backgroundColor: colors.surface }]}>
-            <View style={styles.sectionHeaderIcon}>
-               <View style={[styles.iconContainer, { backgroundColor: colors.primary + '15' }]}>
-                  <Feather name="briefcase" size={18} color={colors.primary} />
-               </View>
-               <Text style={[styles.sectionTitle, { color: colors.text, marginBottom: 0 }]}>Experiencia</Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <View style={[styles.sectionHeaderIcon, { marginBottom: 0 }]}>
+                    <View style={[styles.iconContainer, { backgroundColor: colors.primary + '15' }]}>
+                        <Feather name="briefcase" size={18} color={colors.primary} />
+                    </View>
+                    <Text style={[styles.sectionTitle, { color: colors.text, marginBottom: 0 }]}>Experiencia</Text>
+                </View>
+                <TouchableOpacity onPress={() => handleOpenExperienceModal()} style={{ padding: 4 }}>
+                    <Feather name="plus-circle" size={20} color={colors.primary} />
+                </TouchableOpacity>
             </View>
             
             {cvData?.experiences && cvData.experiences.length > 0 ? (
-                <View style={{ marginTop: 16, marginLeft: 8 }}>
+                <View style={{ marginTop: 4, marginLeft: 8 }}>
                 {cvData.experiences.map((exp, index) => (
-                    <View key={exp.id}>
-                    {renderTimelineItem(
-                        exp.position, 
-                        exp.company_name, 
-                        formatExpDate(exp),
-                        exp.description,
-                        index === cvData.experiences.length - 1 && (!cvData.education || cvData.education.length === 0)
-                    )}
-                    </View>
+                    <TouchableOpacity key={exp.id} onPress={() => handleOpenExperienceModal(exp)} activeOpacity={0.7}>
+                        {renderTimelineItem(
+                            exp.position, 
+                            exp.company_name, 
+                            formatExpDate(exp),
+                            exp.description,
+                            index === cvData.experiences.length - 1 && (!cvData.education || cvData.education.length === 0),
+                            'briefcase' // Optional icon override if renderTimelineItem supports it
+                        )}
+                        <View style={{ position: 'absolute', right: 0, top: 0 }}>
+                             <Feather name="edit-2" size={14} color={colors.textSecondary} />
+                        </View>
+                    </TouchableOpacity>
                 ))}
                 </View>
             ) : (
@@ -343,12 +821,18 @@ export default function MyProfileScreen() {
 
        {/* Education */}
        <View style={[styles.sectionContainer, { backgroundColor: colors.surface }]}>
-          <View style={styles.sectionHeaderIcon}>
-               <View style={[styles.iconContainer, { backgroundColor: colors.primary + '15' }]}>
-                  <Feather name="book" size={18} color={colors.primary} />
-               </View>
-               <Text style={[styles.sectionTitle, { color: colors.text, marginBottom: 0 }]}>Educación</Text>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <View style={[styles.sectionHeaderIcon, { marginBottom: 0 }]}>
+                   <View style={[styles.iconContainer, { backgroundColor: colors.primary + '15' }]}>
+                      <Feather name="book" size={18} color={colors.primary} />
+                   </View>
+                   <Text style={[styles.sectionTitle, { color: colors.text, marginBottom: 0 }]}>Educación</Text>
+                </View>
+                <TouchableOpacity onPress={() => handleOpenEduModal()} style={{ padding: 4 }}>
+                   <Feather name="plus-circle" size={20} color={colors.primary} />
+                </TouchableOpacity>
           </View>
+
           <View style={{ marginTop: 16, marginLeft: 8 }}>
              {/* Universidad Actual (Front-end) */}
              {renderTimelineItem(
@@ -360,17 +844,57 @@ export default function MyProfileScreen() {
              )}
 
             {cvData?.education?.map((edu, index) => (
-               <View key={edu.id}>
-                  {renderTimelineItem(
-                    edu.degree,
-                    edu.institution,
-                    `${edu.start_year} - ${edu.end_year || 'Actualidad'}`,
-                    null,
-                    index === cvData.education.length - 1
-                  )}
-               </View>
+               <TouchableOpacity key={edu.id} onPress={() => handleOpenEduModal(edu)} activeOpacity={0.7}>
+                   <View style={{ position: 'relative' }}>
+                      {renderTimelineItem(
+                        edu.degree,
+                        edu.institution,
+                        `${edu.start_year} - ${edu.end_year || 'Actualidad'}`,
+                        null,
+                        index === cvData.education.length - 1
+                      )}
+                      <View style={{ position: 'absolute', right: 0, top: 0 }}>
+                           <Feather name="edit-2" size={14} color={colors.textSecondary} />
+                      </View>
+                   </View>
+               </TouchableOpacity>
             ))}
           </View>
+       </View>
+
+       {/* Certifications (Added dynamically) */}
+       <View style={[styles.sectionContainer, { backgroundColor: colors.surface }]}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <View style={[styles.sectionHeaderIcon, { marginBottom: 0 }]}>
+                   <View style={[styles.iconContainer, { backgroundColor: colors.primary + '15' }]}>
+                      <MaterialCommunityIcons name="certificate" size={20} color={colors.primary} />
+                   </View>
+                   <Text style={[styles.sectionTitle, { color: colors.text, marginBottom: 0 }]}>Certificaciones</Text>
+              </View>
+              <TouchableOpacity onPress={() => handleOpenCertModal()} style={{ padding: 4 }}>
+                  <Feather name="plus-circle" size={20} color={colors.primary} />
+              </TouchableOpacity>
+          </View>
+          
+          {cvData?.certifications && cvData.certifications.length > 0 ? (
+             <View style={{ marginTop: 8, marginLeft: 8 }}>
+                {cvData.certifications.map((cert, index) => (
+                   <TouchableOpacity key={cert.id} onPress={() => handleOpenCertModal(cert)} activeOpacity={0.7} style={{ marginBottom: 12 }}>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                          <View style={{ flex: 1 }}>
+                              <Text style={{ fontSize: 16, fontWeight: '700', color: colors.text, marginBottom: 2 }}>{cert.title}</Text>
+                              <Text style={{ fontSize: 14, color: colors.primary, marginBottom: 4 }}>{cert.institution}</Text>
+                              <Text style={{ fontSize: 12, color: colors.textSecondary }}>{cert.start_year} - {cert.end_year}</Text>
+                          </View>
+                          <Feather name="edit-2" size={14} color={colors.textSecondary} style={{ marginTop: 4 }} />
+                      </View>
+                      {index < cvData.certifications.length - 1 && <View style={{ height: 1, backgroundColor: colors.border, marginTop: 12 }} />}
+                   </TouchableOpacity>
+                ))}
+             </View>
+          ) : (
+             <Text style={{ color: colors.textSecondary + '80', marginTop: 8, fontStyle: 'italic' }}>No hay certificaciones registradas</Text>
+          )}
        </View>
     </View>
   );
@@ -544,6 +1068,43 @@ export default function MyProfileScreen() {
               </View>
         </View>
       </Animated.ScrollView>
+
+      <ExperienceModal
+        visible={experienceModalVisible}
+        onClose={() => setExperienceModalVisible(false)}
+        onSave={handleSaveExperience}
+        initialData={selectedExperience}
+      />
+      <CertificationModal
+        visible={certModalVisible}
+        onClose={() => setCertModalVisible(false)}
+        onSave={handleSaveCert}
+        initialData={selectedCert}
+      />
+      <EducationModal
+        visible={eduModalVisible}
+        onClose={() => setEduModalVisible(false)}
+        onSave={handleSaveEdu}
+        initialData={selectedEdu}
+      />
+      <SkillsEditModal
+        visible={skillsModalVisible}
+        onClose={() => setSkillsModalVisible(false)}
+        onSave={handleSaveSkills}
+        initialSkills={cvData?.skills ? cvData.skills.map(s => s.skill_name) : []}
+      />
+      <LanguageModal
+        visible={langModalVisible}
+        onClose={() => setLangModalVisible(false)}
+        onSave={handleSaveLanguage}
+        initialData={selectedLang}
+      />
+      <SummaryModal
+        visible={summaryModalVisible}
+        onClose={() => setSummaryModalVisible(false)}
+        onSave={handleSaveSummary}
+        initialSummary={cvData?.summary}
+      />
     </View>
   );
 }
@@ -601,7 +1162,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     marginBottom: 24,
   },
-  avatarWrapper: {
+  avatarContainer: {
     marginBottom: 16,
   },
   nameText: {
