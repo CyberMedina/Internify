@@ -17,7 +17,8 @@
 ### 2. 🚀 Onboarding y Bienvenida
 *   Flujo guiado para nuevos usuarios.
 *   Recolección inicial de datos personales y académicos.
-*   **CV Wizard:** Asistente paso a paso para la construcción inicial del perfil.
+*   **Carga Inteligente de CV:** Sube tu hoja de vida en PDF y nuestra **Inteligencia Artificial** analizará y extraerá automáticamente tu experiencia, educación y habilidades para autocompletar tu perfil.
+*   **CV Wizard:** Asistente paso a paso para la construcción inicial o manual del perfil.
 
 ### 3. 🔍 Descubrimiento de Oportunidades
 *   **Dashboard Personalizado:** Algoritmo de sugerencias basado en el perfil del estudiante.
