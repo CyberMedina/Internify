@@ -4,6 +4,7 @@ import { Feather, MaterialIcons } from '@expo/vector-icons';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, Layout } from 'react-native-reanimated';
 import ScreenContainer from '../../components/ScreenContainer';
 import { useTheme } from '../../theme/ThemeContext';
+import GradientButton from '../../components/GradientButton';
 import { useAuth } from '../../context/AuthContext';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { OnboardingStackParamList } from '../../navigation/OnboardingStack';
@@ -157,15 +158,10 @@ export default function OnboardingPersonalDataScreen({ navigation }: Props) {
         </ScrollView>
 
         <View style={[styles.footer, { backgroundColor: colors.card, borderTopColor: colors.border }]}>
-          <TouchableOpacity
-            style={[styles.button, { backgroundColor: colors.primary }]}
+          <GradientButton
             onPress={() => navigation.navigate('AcademicProfile')}
-            activeOpacity={0.9}
-          >
-            <Text style={[styles.buttonText, { color: '#FFF', fontSize: typography.sizes.md, fontFamily: typography.medium }]}>
-              Todo correcto, continuar
-            </Text>
-          </TouchableOpacity>
+            title="Todo correcto, continuar"
+          />
         </View>
       </KeyboardAvoidingView>
     </ScreenContainer>

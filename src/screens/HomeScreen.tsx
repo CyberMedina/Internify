@@ -14,15 +14,11 @@ import Animated, {
   FadeOut
 } from 'react-native-reanimated';
 
-if (Platform.OS === 'android') {
-  if (UIManager.setLayoutAnimationEnabledExperimental) {
-    UIManager.setLayoutAnimationEnabledExperimental(true);
-  }
-}
 import { LinearGradient } from 'expo-linear-gradient';
 import JobCardLarge, { Job } from '../components/JobCardLarge';
 import JobCardSmall from '../components/JobCardSmall';
 import Chip from '../components/Chip';
+import GradientButton from '../components/GradientButton';
 import LevelAvatar from '../components/LevelAvatar';
 import { internshipLevels } from '../mock/user';
 import ScreenContainer from '../components/ScreenContainer';
@@ -33,10 +29,12 @@ import SkeletonChip from '../components/skeletons/SkeletonChip';
 import { useI18n } from '../i18n/i18n';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
+import { useSaved } from '../context/SavedContext';
 import { getSuggestedVacancies, getCategories, getVacancies } from '../services/vacancyService';
 import { Vacancy, Category } from '../types/vacancy';
 
 const AnimatedFlashList = Animated.createAnimatedComponent(FlashList);
+const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
 
 const mapVacancyToJob = (v: Vacancy): Job => ({
   id: v.id.toString(),
@@ -48,13 +46,16 @@ const mapVacancyToJob = (v: Vacancy): Job => ({
   salary: v.salary_range ? `C$${v.salary_range}` : 'Anónimo',
   avatars: [],
   companyLogo: v.company.logo || v.company.photo,
-  postedTime: v.dates?.posted_human
+  postedTime: v.dates?.posted_human,
+  isApplied: v.is_applied,
+  isSaved: v.is_saved
 });
 
 export default function HomeScreen() {
   const { colors, spacing, typography, toggleScheme } = useTheme();
   const { t } = useI18n();
   const { studentProfile, fetchStudentProfile, userToken } = useAuth();
+  const savedCtx = useSaved();
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
   
@@ -124,7 +125,9 @@ export default function HomeScreen() {
     if (!userToken) return;
     try {
       const res = await getSuggestedVacancies(userToken);
-      setSuggested(res.data.map(mapVacancyToJob));
+      const jobs = res.data.map(mapVacancyToJob);
+      setSuggested(jobs);
+      savedCtx?.mergeSaved(jobs);
     } catch (error) {
       console.error(error);
     }
@@ -150,6 +153,7 @@ export default function HomeScreen() {
       const res = await getVacancies(userToken, pageNum, 10, { search, categoryId: catId || undefined });
       
       const newJobs = res.data.map(mapVacancyToJob);
+      savedCtx?.mergeSaved(newJobs);
       const hasNextPage = !!res.links.next;
       
       let updatedList: Job[] = [];
@@ -284,8 +288,21 @@ export default function HomeScreen() {
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     setPage(1);
-    await loadInitialData();
-    setRefreshing(false);
+    
+    try {
+      const promises = [
+        fetchStudentProfile(),
+        fetchSuggested(),
+        fetchCategories(),
+        fetchRecent(1, searchText, activeCatId)
+      ];
+      
+      await Promise.all(promises);
+    } catch (error) {
+      console.error('Error refreshing data:', error);
+    } finally {
+      setRefreshing(false);
+    }
   }, [userToken, activeCatId, searchText]);
 
   const handleCategoryPress = (catId: number | null) => {
@@ -293,6 +310,7 @@ export default function HomeScreen() {
     
     // Reset header animation
     scrollY.value = 0;
+    expandY.value = AVATAR_SECTION_HEIGHT;
     
     // LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut); // Eliminamos LayoutAnimation para usar Reanimated
     setActiveCatId(catId);
@@ -348,19 +366,40 @@ export default function HomeScreen() {
   const saludo = hour < 12 ? t('home.goodMorning') : hour < 19 ? t('home.goodAfternoon') : t('home.goodEvening');
 
   // Animation Constants & Logic
-  const scrollY = useSharedValue(0);
-  const scrollHandler = useAnimatedScrollHandler((event) => {
-    scrollY.value = event.contentOffset.y;
-  });
-
   // Alturas estimadas para la animación
   // Avatar Row: ~48px height + margins. Vamos a animar un contenedor de ~70px a 0.
   const AVATAR_SECTION_HEIGHT = 70;
   
+  const scrollY = useSharedValue(0);
+  const expandY = useSharedValue(AVATAR_SECTION_HEIGHT);
+
+  const scrollHandler = useAnimatedScrollHandler({
+    onScroll: (event, ctx: { prevY?: number }) => {
+      const currentY = event.contentOffset.y;
+      const prevY = ctx.prevY ?? 0;
+      const diff = currentY - prevY;
+
+      if (currentY < 0) {
+        expandY.value = AVATAR_SECTION_HEIGHT;
+      } else {
+        let newHeight = expandY.value - diff;
+        if (newHeight < 0) newHeight = 0;
+        if (newHeight > AVATAR_SECTION_HEIGHT) newHeight = AVATAR_SECTION_HEIGHT;
+        expandY.value = newHeight;
+      }
+      
+      scrollY.value = currentY;
+      ctx.prevY = currentY;
+    },
+    onBeginDrag: (event, ctx: { prevY?: number }) => {
+      ctx.prevY = event.contentOffset.y;
+    }
+  });
+  
   const avatarAnimatedStyle = useAnimatedStyle(() => {
-    const height = interpolate(scrollY.value, [0, AVATAR_SECTION_HEIGHT], [AVATAR_SECTION_HEIGHT, 0], Extrapolation.CLAMP);
-    const opacity = interpolate(scrollY.value, [0, AVATAR_SECTION_HEIGHT * 0.6], [1, 0], Extrapolation.CLAMP);
-    const translateY = interpolate(scrollY.value, [0, AVATAR_SECTION_HEIGHT], [0, -20], Extrapolation.CLAMP);
+    const height = expandY.value;
+    const opacity = interpolate(height, [AVATAR_SECTION_HEIGHT * 0.4, AVATAR_SECTION_HEIGHT], [0, 1], Extrapolation.CLAMP);
+    const translateY = interpolate(height, [0, AVATAR_SECTION_HEIGHT], [-20, 0], Extrapolation.CLAMP);
     
     return {
       height,
@@ -371,11 +410,7 @@ export default function HomeScreen() {
   });
 
   const headerContainerAnimatedStyle = useAnimatedStyle(() => {
-    // Mantenemos un radio mínimo de 25px incluso al colapsar, o podemos reducirlo ligeramente si se desea.
-    // La instrucción pide "Aplica un borderRadius de 25px... para que no sea un corte recto".
-    // Vamos a mantenerlo fijo en 25px o interpolarlo muy poco (ej. 25 -> 20).
-    // Si el usuario quiere que NO sea recto, entonces no debemos llegar a 0.
-    const borderRadius = interpolate(scrollY.value, [0, AVATAR_SECTION_HEIGHT], [30, 25], Extrapolation.CLAMP);
+    const borderRadius = interpolate(expandY.value, [0, AVATAR_SECTION_HEIGHT], [25, 30], Extrapolation.CLAMP);
     return {
       borderBottomLeftRadius: borderRadius,
       borderBottomRightRadius: borderRadius,
@@ -388,11 +423,10 @@ export default function HomeScreen() {
   // Total Expanded: Insets + 70 + 76 + 60 = Insets + 206
   const CONTENT_PADDING_TOP = insets.top + 206;
 
-  // Animated Linear Gradient
-  const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
+
 
   const renderItem = useCallback(({ item, index }: { item: Job, index: number }) => (
-    <Animated.View entering={FadeIn.duration(300)} exiting={FadeOut.duration(200)}>
+    <Animated.View entering={FadeIn.duration(300)}>
       <JobCardSmall 
         job={item} 
         style={{ marginHorizontal: spacing(2) }} 
@@ -405,11 +439,9 @@ export default function HomeScreen() {
   // Eliminamos getItemLayout porque las tarjetas tienen altura variable (texto dinámico)
   // y una altura fija incorrecta causa saltos visuales ("pop") y espacios en blanco.
 
-  if (loading) {
-    return <HomeSkeleton />;
-  }
 
-  const renderListHeader = () => (
+
+  const ListHeader = useMemo(() => (
     <View style={{ paddingTop: spacing(2) }}>
       {/* Widget de Progreso del Perfil */}
       {studentProfile && !studentProfile.has_cv && (
@@ -451,24 +483,10 @@ export default function HomeScreen() {
             </View>
           </View>
 
-          <TouchableOpacity 
+          <GradientButton 
+            title="Finalizar mi perfil ahora"
             onPress={() => navigation.navigate('Onboarding', { screen: 'CVStart' })}
-            activeOpacity={0.9}
-            style={{ 
-              backgroundColor: colors.primary, 
-              paddingVertical: spacing(1.5), 
-              borderRadius: 14, 
-              alignItems: 'center',
-              shadowColor: colors.primary,
-              shadowOffset: { width: 0, height: 4 },
-              shadowOpacity: 0.3,
-              elevation: 4
-            }}
-          >
-            <Text style={{ color: '#FFF', fontWeight: '700', fontSize: typography.sizes.md }}>
-              Finalizar mi perfil ahora
-            </Text>
-          </TouchableOpacity>
+          />
         </View>
       )}
 
@@ -501,7 +519,11 @@ export default function HomeScreen() {
         <Text style={{ fontSize: typography.sizes.lg, fontWeight: '700', color: colors.text }}>{t('home.recent')}</Text>
       </View>
     </View>
-  );
+  ), [studentProfile, suggested, colors, spacing, typography, t, navigation]);
+
+  if (loading) {
+    return <HomeSkeleton />;
+  }
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.card }}>
@@ -625,8 +647,9 @@ export default function HomeScreen() {
         data={recent}
         keyExtractor={keyExtractor}
         renderItem={renderItem}
-        estimatedItemSize={150}
-        ListHeaderComponent={renderListHeader}
+        estimatedItemSize={200}
+        drawDistance={1000}
+        ListHeaderComponent={ListHeader}
         ListEmptyComponent={
           isCategoryLoading ? (
             <View style={{ paddingHorizontal: spacing(2), marginTop: spacing(2) }}>
@@ -655,7 +678,7 @@ export default function HomeScreen() {
         onScroll={scrollHandler}
         scrollEventThrottle={16}
         contentContainerStyle={{ paddingTop: CONTENT_PADDING_TOP, paddingBottom: spacing(2) }}
-        showsVerticalScrollIndicator={true}
+        showsVerticalScrollIndicator={false}
         scrollIndicatorInsets={{ top: CONTENT_PADDING_TOP }}
         progressViewOffset={CONTENT_PADDING_TOP}
         onEndReached={handleLoadMore}

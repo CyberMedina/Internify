@@ -5,6 +5,10 @@ export interface Company {
   photo?: string;
   logo?: string;
   description?: string;
+  user_detail?: {
+    user_id: number;
+    pf_photo: string;
+  };
 }
 
 export interface Vacancy {
@@ -12,6 +16,8 @@ export interface Vacancy {
   title: string;
   description: string;
   requirements: string[];
+  is_applied?: boolean;
+  is_saved?: boolean;
   modality: {
     code: string;
     label: string;
@@ -103,6 +109,16 @@ export interface TimelineEvent {
   completed: boolean;
 }
 
+export interface ApplicationHistory {
+  id: number;
+  application_id: number;
+  status: string; // "Pending", "reviewed", etc.
+  title: string;
+  description: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Application {
   id: number;
   vacancy_id: number;
@@ -115,5 +131,6 @@ export interface Application {
   created_at: string;
   updated_at: string;
   vacancy: Vacancy;
-  timeline?: TimelineEvent[];
+  timeline?: TimelineEvent[]; // Keep for backward compatibility if needed, or remove
+  history?: ApplicationHistory[];
 }

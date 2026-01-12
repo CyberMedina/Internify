@@ -7,16 +7,22 @@ import { Feather } from '@expo/vector-icons';
 import { Job } from './JobCardLarge';
 import { useNavigation } from '@react-navigation/native';
 import { useSaved } from '../context/SavedContext';
+import { useApplications } from '../context/ApplicationsContext';
 import { useI18n } from '../i18n/i18n';
 import { getInitials } from '../utils/stringUtils';
 
+import BookmarkButton from './BookmarkButton';
+
 const JobCardSmall = memo(({ job, applicantsLabel, bookmarked, onToggleBookmark, style }: { job: Job; applicantsLabel?: string; bookmarked?: boolean; onToggleBookmark?: () => void; style?: any }) => {
-  const { colors, spacing, radius, typography } = useTheme();
+  const { colors, spacing, radius, typography, isDark } = useTheme();
   const navigation = useNavigation<any>();
   const savedCtx = useSaved();
+  const applicationsCtx = useApplications();
   const { t } = useI18n();
   const isSaved = bookmarked ?? (savedCtx?.isSaved(job.id) ?? false);
-  const toggle = onToggleBookmark ?? (savedCtx ? () => savedCtx.toggle(job) : undefined);
+  const isApplied = job.isApplied || applicationsCtx.hasApplied(job.id);
+  const isLoading = savedCtx?.isProcessing(job.id) ?? false;
+  const toggle = onToggleBookmark ?? (savedCtx ? () => savedCtx.toggle(job) : () => {});
   const applicantsText = applicantsLabel ?? t('common.applicants');
   return (
     <TouchableOpacity
@@ -38,19 +44,25 @@ const JobCardSmall = memo(({ job, applicantsLabel, bookmarked, onToggleBookmark,
             <Text style={{ color: colors.textSecondary, fontSize: typography.sizes.sm }} numberOfLines={1} ellipsizeMode="tail">{job.company}</Text>
           </View>
         </View>
-        <TouchableOpacity
-          onPress={toggle}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        <BookmarkButton 
+          isSaved={isSaved} 
+          isLoading={isLoading}
+          onToggle={toggle} 
+          size={18} 
           style={{ padding: 4 }}
-          disabled={!toggle}
-        >
-          <Feather name="bookmark" size={18} color={isSaved ? colors.primary : colors.textSecondary} />
-        </TouchableOpacity>
+        />
       </View>
 
       <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: spacing(0.5) }}>
         <Feather name="map-pin" size={12} color={colors.textSecondary} />
         <Text style={{ color: colors.textSecondary, marginLeft: 4, fontSize: typography.sizes.xs }}>{job.location}</Text>
+        
+        {isApplied && (
+           <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 8, backgroundColor: isDark ? 'rgba(16, 185, 129, 0.2)' : '#D1FAE5', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
+              <Feather name="check-circle" size={10} color={isDark ? '#34D399' : '#059669'} />
+              <Text style={{ fontSize: 10, color: isDark ? '#34D399' : '#059669', marginLeft: 3, fontWeight: '700' }}>Aplicado</Text>
+           </View>
+        )}
       </View>
 
       <View style={{ flexDirection: 'row', marginTop: spacing(1), alignItems: 'center' }}>

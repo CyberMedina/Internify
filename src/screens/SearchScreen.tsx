@@ -15,6 +15,7 @@ import SkeletonJobCardSmall from '../components/skeletons/SkeletonJobCardSmall';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { getRecentSearches, addRecentSearch, removeRecentSearch, getRecentlyViewed, clearRecentlyViewed } from '../utils/storage';
+import { useSaved } from '../context/SavedContext';
 
 const mapVacancyToJob = (v: Vacancy): Job => ({
   id: v.id.toString(),
@@ -26,7 +27,9 @@ const mapVacancyToJob = (v: Vacancy): Job => ({
   salary: v.salary_range ? `C$${v.salary_range}` : 'Anónimo',
   avatars: [],
   companyLogo: v.company.logo || v.company.photo,
-  postedTime: v.dates?.posted_human
+  postedTime: v.dates?.posted_human,
+  isApplied: v.is_applied,
+  isSaved: v.is_saved
 });
 
 export default function SearchScreen() {
@@ -35,6 +38,7 @@ export default function SearchScreen() {
   const { t } = useI18n();
   const navigation = useNavigation<any>();
   const { userToken } = useAuth();
+  const savedCtx = useSaved();
   
   const [query, setQuery] = useState('');
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
@@ -121,7 +125,9 @@ export default function SearchScreen() {
     
     try {
       const res = await getVacancies(userToken, 1, 20, { search: cleanText });
-      setResults(res.data.map(mapVacancyToJob));
+      const searchResults = res.data.map(mapVacancyToJob);
+      setResults(searchResults);
+      savedCtx?.mergeSaved(searchResults);
     } catch (error) {
       console.error(error);
     } finally {
@@ -153,7 +159,7 @@ export default function SearchScreen() {
           <TouchableOpacity
             onPress={() => {
               if (navigation.canGoBack()) navigation.goBack();
-              else navigation.getParent()?.navigate(t('tabs.home'));
+              else navigation.getParent()?.navigate('HomeTab');
             }}
             style={{ 
               width: 40, 

@@ -13,6 +13,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import ScreenContainer from '../../components/ScreenContainer';
 import { useTheme } from '../../theme/ThemeContext';
+import GradientButton from '../../components/GradientButton';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { OnboardingStackParamList } from '../../navigation/OnboardingStack';
 
@@ -102,19 +103,13 @@ export default function OnboardingCompletionScreen({ navigation }: Props) {
         </View>
 
         <Animated.View entering={FadeInUp.delay(700).duration(600)} style={{ width: '100%' }}>
-          <TouchableOpacity
-            activeOpacity={1}
-            onPressIn={handlePressIn}
-            onPressOut={handlePressOut}
+          <GradientButton
             onPress={handleFinish}
-          >
-            <Animated.View style={[styles.button, { backgroundColor: colors.primary }, buttonAnimatedStyle]}>
-              <Text style={[styles.buttonText, { color: '#FFF', fontSize: 18, fontFamily: typography.bold }]}>
-                Explorar Vacantes
-              </Text>
-              <FontAwesome5 name="arrow-right" size={18} color="#FFF" style={{ marginLeft: 10 }} />
-            </Animated.View>
-          </TouchableOpacity>
+            title="Explorar Vacantes"
+            icon={<FontAwesome5 name="arrow-right" size={18} color="#FFF" />}
+            iconPosition="right"
+            style={{ height: 64, borderRadius: 20 }}
+          />
         </Animated.View>
       </View>
     </ScreenContainer>

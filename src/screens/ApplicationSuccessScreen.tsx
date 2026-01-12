@@ -5,6 +5,7 @@ import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { useI18n } from '../i18n/i18n';
+import GradientButton from '../components/GradientButton';
 
 export default function ApplicationSuccessScreen() {
   const { colors, spacing, typography } = useTheme();
@@ -59,13 +60,10 @@ export default function ApplicationSuccessScreen() {
 
       {/* Bottom actions fixed */}
       <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: spacing(2), paddingBottom: insets.bottom + spacing(1.5), paddingTop: spacing(1), backgroundColor: colors.surface, borderTopColor: colors.border, borderTopWidth: 1 }}>
-        <TouchableOpacity
-          activeOpacity={0.9}
+        <GradientButton
           onPress={() => navigation.navigate('HomeMain')}
-          style={{ backgroundColor: colors.primary, borderRadius: 28, alignItems: 'center', justifyContent: 'center', height: 52 }}
-        >
-          <Text style={{ color: '#fff', fontWeight: '700' }}>{t('common.goHome')}</Text>
-        </TouchableOpacity>
+          title={t('common.goHome')}
+        />
       </View>
     </View>
   );

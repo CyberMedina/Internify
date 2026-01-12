@@ -1,8 +1,11 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Alert } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Alert, Image } from 'react-native';
 import { FontAwesome5, MaterialCommunityIcons } from '@expo/vector-icons';
 import ScreenContainer from '../../components/ScreenContainer';
+import OnboardingHeader from '../../components/OnboardingHeader';
+import { api } from '../../services/api';
 import { useTheme } from '../../theme/ThemeContext';
+import GradientButton from '../../components/GradientButton';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { OnboardingStackParamList } from '../../navigation/OnboardingStack';
 import { currentUser } from '../../mock/user';
@@ -15,6 +18,33 @@ export default function OnboardingCVPreviewScreen({ navigation }: Props) {
   const { cvProfile } = currentUser;
   const { userToken } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [profileData, setProfileData] = useState<any>(null);
+  const [isLoadingProfile, setIsLoadingProfile] = useState(true);
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        if (userToken) {
+          const response = await api.get<any>('/student/profile', { token: userToken });
+          setProfileData(response);
+        }
+      } catch (error) {
+        console.error('Error fetching profile:', error);
+      } finally {
+        setIsLoadingProfile(false);
+      }
+    };
+
+    fetchProfile();
+  }, [userToken]);
+
+  const displayNames = profileData?.profile?.first_name || currentUser.names;
+  const displayLastnames = profileData?.profile?.last_name || currentUser.lastnames;
+  const displayCareer = profileData?.academic_info?.career || currentUser.career;
+  const displayEmail = profileData?.email || currentUser.email;
+  const displayPhone = profileData?.profile?.phone || currentUser.phone;
+  const displayFaculty = profileData?.academic_info?.department || currentUser.faculty;
+  const displayPhoto = profileData?.profile?.photo;
 
   const handleFinish = async () => {
     setIsSubmitting(true);
@@ -68,22 +98,13 @@ export default function OnboardingCVPreviewScreen({ navigation }: Props) {
       // Usar el token del contexto o el token de prueba si no hay uno en el contexto (para desarrollo)
       const tokenToUse = userToken || '11|J5usnuuejmXjybZnaCIyKwDI6lL9xkyI5PTGYrvnbc98614d';
 
-      const response = await fetch('https://overfoul-domingo-unharmable.ngrok-free.dev/api/student/cv', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${tokenToUse}`,
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(dataToSend),
-      });
+      const responseData = await api.post<any>('/student/cv', dataToSend, { token: tokenToUse });
 
-      const responseData = await response.json();
+      console.log('📡 RESPUESTA DEL SERVIDOR:', JSON.stringify(responseData, null, 2));
 
-      console.log('📡 RESPUESTA DEL SERVIDOR:', response.status);
-      console.log(JSON.stringify(responseData, null, 2));
-
-      if (!response.ok) {
+      // Si llegamos aquí, la petición fue exitosa (status 200-299)
+      // Verificamos si el backend devuelve un flag de éxito lógico
+      if (responseData && responseData.success === false) {
         throw new Error(responseData.message || 'Error al guardar el perfil');
       }
 
@@ -149,26 +170,30 @@ export default function OnboardingCVPreviewScreen({ navigation }: Props) {
 
   return (
     <ScreenContainer safeTop safeBottom style={styles.container}>
-      <View style={styles.header}>
-        <Text style={[styles.title, { color: colors.text, fontSize: typography.sizes.xl, fontFamily: typography.bold }]}>
-          Vista Previa
-        </Text>
-        <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-          ¡Se ve excelente! Así es como las empresas verán tu perfil.
-        </Text>
-      </View>
+      <OnboardingHeader 
+        icon="eye" 
+        title="Vista Previa" 
+        subtitle="¡Se ve excelente! Así es como las empresas verán tu perfil."
+      />
 
       <ScrollView contentContainerStyle={styles.content}>
         {/* Header Card */}
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <View style={styles.profileHeader}>
-            <View style={[styles.avatarPlaceholder, { backgroundColor: colors.primary }]}>
-              <Text style={{ color: '#FFF', fontSize: 24, fontWeight: 'bold' }}>{currentUser.names.charAt(0)}</Text>
-            </View>
+            {displayPhoto ? (
+              <Image 
+                source={{ uri: displayPhoto }} 
+                style={[styles.avatarPlaceholder, { backgroundColor: colors.surface }]} 
+              />
+            ) : (
+              <View style={[styles.avatarPlaceholder, { backgroundColor: colors.primary }]}>
+                <Text style={{ color: '#FFF', fontSize: 24, fontWeight: 'bold' }}>{displayNames.charAt(0)}</Text>
+              </View>
+            )}
             <View style={{ flex: 1 }}>
-              <Text style={[styles.name, { color: colors.text }]}>{`${currentUser.names} ${currentUser.lastnames}`}</Text>
-              <Text style={[styles.career, { color: colors.textSecondary }]}>{currentUser.career}</Text>
-              <Text style={[styles.contact, { color: colors.textSecondary }]}>{currentUser.email} • {currentUser.phone}</Text>
+              <Text style={[styles.name, { color: colors.text }]}>{`${displayNames} ${displayLastnames}`}</Text>
+              <Text style={[styles.career, { color: colors.textSecondary }]}>{displayCareer}</Text>
+              <Text style={[styles.contact, { color: colors.textSecondary }]}>{displayEmail} • {displayPhone}</Text>
             </View>
           </View>
         </View>
@@ -182,20 +207,24 @@ export default function OnboardingCVPreviewScreen({ navigation }: Props) {
         {/* Education */}
         <View style={[styles.section, { borderLeftColor: colors.primary }]}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>EDUCACIÓN</Text>
-          <Text style={[styles.itemTitle, { color: colors.text }]}>{currentUser.career}</Text>
-          <Text style={[styles.itemSubtitle, { color: colors.textSecondary }]}>{currentUser.faculty}</Text>
+          <Text style={[styles.itemTitle, { color: colors.text }]}>{displayCareer}</Text>
+          <Text style={[styles.itemSubtitle, { color: colors.textSecondary }]}>{displayFaculty}</Text>
           
-          <View style={{ height: 12 }} />
-          
-          <Text style={[styles.itemTitle, { color: colors.text }]}>{cvProfile?.secondaryEducation.title}</Text>
-          <Text style={[styles.itemSubtitle, { color: colors.textSecondary }]}>
-            {cvProfile?.secondaryEducation.school} • {formatDuration(
-              cvProfile?.secondaryEducation.startMonth, 
-              cvProfile?.secondaryEducation.startYear, 
-              cvProfile?.secondaryEducation.endMonth, 
-              cvProfile?.secondaryEducation.endYear
-            )}
-          </Text>
+          {cvProfile?.secondaryEducation?.school && (
+            <>
+              <View style={{ height: 12 }} />
+              
+              <Text style={[styles.itemTitle, { color: colors.text }]}>{cvProfile?.secondaryEducation.title}</Text>
+              <Text style={[styles.itemSubtitle, { color: colors.textSecondary }]}>
+                {cvProfile?.secondaryEducation.school} • {formatDuration(
+                  cvProfile?.secondaryEducation.startMonth, 
+                  cvProfile?.secondaryEducation.startYear, 
+                  cvProfile?.secondaryEducation.endMonth, 
+                  cvProfile?.secondaryEducation.endYear
+                )}
+              </Text>
+            </>
+          )}
         </View>
 
         {/* Experience */}
@@ -260,22 +289,13 @@ export default function OnboardingCVPreviewScreen({ navigation }: Props) {
       </ScrollView>
 
       <View style={[styles.footer, { backgroundColor: colors.card, borderTopColor: colors.border }]}>
-        <TouchableOpacity
-          style={[styles.button, { backgroundColor: colors.success, opacity: isSubmitting ? 0.7 : 1 }]}
+        <GradientButton
           onPress={handleFinish}
-          disabled={isSubmitting}
-        >
-          {isSubmitting ? (
-            <ActivityIndicator color="#FFF" />
-          ) : (
-            <>
-              <Text style={[styles.buttonText, { color: '#FFF' }]}>
-                Finalizar y Guardar Perfil
-              </Text>
-              <FontAwesome5 name="check" size={16} color="#FFF" style={{ marginLeft: 8 }} />
-            </>
-          )}
-        </TouchableOpacity>
+          title="Finalizar y Guardar Perfil"
+          loading={isSubmitting}
+          icon={<FontAwesome5 name="check" size={16} color="#FFF" />}
+          iconPosition="right"
+        />
       </View>
     </ScreenContainer>
   );
@@ -316,6 +336,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 16,
+    overflow: 'hidden', // Ensure image respects border radius
   },
   name: {
     fontSize: 18,

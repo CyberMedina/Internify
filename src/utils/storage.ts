@@ -64,3 +64,43 @@ export const clearRecentlyViewed = async () => {
   }
 };
 
+const NOTIFICATION_CONSENT_KEY = 'notification_consent_shown';
+
+export const getNotificationConsent = async (): Promise<boolean> => {
+  try {
+    const value = await AsyncStorage.getItem(NOTIFICATION_CONSENT_KEY);
+    return value === 'true';
+  } catch (e) {
+    return false;
+  }
+};
+
+export const setNotificationConsent = async (shown: boolean) => {
+  try {
+    await AsyncStorage.setItem(NOTIFICATION_CONSENT_KEY, String(shown));
+  } catch (e) {
+    // ignore
+  }
+};
+
+const NOTIFICATION_CONSENT_GRANTED_KEY = 'notification_consent_granted';
+
+export const getNotificationConsentGranted = async (): Promise<boolean> => {
+  try {
+    const value = await AsyncStorage.getItem(NOTIFICATION_CONSENT_GRANTED_KEY);
+    return value === 'true';
+  } catch (e) {
+    return false;
+  }
+};
+
+export const setNotificationConsentGranted = async (granted: boolean) => {
+  try {
+    await AsyncStorage.setItem(NOTIFICATION_CONSENT_GRANTED_KEY, String(granted));
+  } catch (e) {
+    // ignore
+  }
+};
+
+
+

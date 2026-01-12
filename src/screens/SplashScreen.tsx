@@ -7,6 +7,8 @@ import { useNavigation } from '@react-navigation/native';
 import { useI18n } from '../i18n/i18n';
 import { StatusBar } from 'expo-status-bar';
 import { useAuth } from '../context/AuthContext';
+import { getNotificationConsent, getNotificationConsentGranted } from '../utils/storage';
+import * as Notifications from 'expo-notifications';
 
 export default function SplashScreen() {
   const { colors, typography } = useTheme();
@@ -35,12 +37,37 @@ export default function SplashScreen() {
 
   React.useEffect(() => {
     if (!isLoading) {
-      const timer = setTimeout(() => {
+      const checkConsentAndNavigate = async () => {
         if (userToken) {
           navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
         } else {
-          navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
+          const consentShown = await getNotificationConsent();
+          
+          let shouldShowConsent = !consentShown;
+
+          // Si ya se mostró antes, verificamos si es una reinstalación (backup restaurado)
+          if (consentShown) {
+            const consentGranted = await getNotificationConsentGranted();
+            if (consentGranted) {
+              const { status } = await Notifications.getPermissionsAsync();
+              // Si teníamos permiso guardado pero el sistema dice que no,
+              // mostramos la pantalla de consentimiento de nuevo
+              if (status !== 'granted') {
+                shouldShowConsent = true;
+              }
+            }
+          }
+
+          if (!shouldShowConsent) {
+            navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
+          } else {
+            navigation.reset({ index: 0, routes: [{ name: 'NotificationConsent' }] });
+          }
         }
+      };
+
+      const timer = setTimeout(() => {
+        checkConsentAndNavigate();
       }, 1400);
       return () => clearTimeout(timer);
     }

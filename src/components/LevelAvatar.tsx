@@ -101,8 +101,8 @@ const LevelAvatar: React.FC<LevelAvatarProps> = ({
       <View
         style={{
           position: 'absolute',
-          bottom: -2,
-          right: -2,
+          bottom: 0,
+          right: 0,
           backgroundColor: activeColor,
           borderRadius: 10,
           minWidth: 18,

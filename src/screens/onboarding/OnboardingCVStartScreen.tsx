@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
-import { FontAwesome5, MaterialCommunityIcons } from '@expo/vector-icons';
+import { FontAwesome5, MaterialCommunityIcons, Feather } from '@expo/vector-icons';
 import Animated, { FadeInDown, FadeOut } from 'react-native-reanimated';
 import * as DocumentPicker from 'expo-document-picker';
 import LottieView from 'lottie-react-native';
 import ScreenContainer from '../../components/ScreenContainer';
+import OnboardingHeader from '../../components/OnboardingHeader';
+import { api } from '../../services/api';
 import { useTheme } from '../../theme/ThemeContext';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { OnboardingStackParamList } from '../../navigation/OnboardingStack';
@@ -38,19 +40,7 @@ export default function OnboardingCVStartScreen({ navigation }: Props) {
         type: file.mimeType || 'application/pdf',
       } as any);
 
-      const response = await fetch('https://overfoul-domingo-unharmable.ngrok-free.dev/api/parse-cv', {
-        method: 'POST',
-        body: formData,
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error('Error al procesar el CV');
-      }
-
-      const data = await response.json();
+      const data = await api.post<any>('/parse-cv', formData);
       
       setIsProcessing(false);
       navigation.navigate('CVWizard', { mode: 'ai', cvData: data });
@@ -89,15 +79,31 @@ export default function OnboardingCVStartScreen({ navigation }: Props) {
 
   return (
     <ScreenContainer safeTop safeBottom style={styles.container}>
+      <View style={styles.topBar}>
+        <TouchableOpacity 
+          onPress={() => navigation.goBack()}
+          style={{ 
+            width: 40, 
+            height: 40, 
+            borderRadius: 20, 
+            backgroundColor: colors.surface, 
+            alignItems: 'center', 
+            justifyContent: 'center',
+            // Add shadow to match if needed, but NotificationsScreen doesn't seem to have explicit shadow on the button itself, just bg color.
+            // However, if the background is white/surface, it might need shadow if on white bg.
+            // NotificationsScreen uses colors.surface.
+          }}
+        >
+          <Feather name="arrow-left" size={18} color={colors.text} />
+        </TouchableOpacity>
+      </View>
+
       <View style={styles.content}>
-        <View style={styles.header}>
-          <Text style={[styles.title, { color: colors.text, fontSize: typography.sizes.xxl, fontFamily: typography.bold }]}>
-            Construyamos tu Perfil Profesional
-          </Text>
-          <Text style={[styles.subtitle, { color: colors.textSecondary, fontSize: typography.sizes.md }]}>
-            Para aplicar a las vacantes, necesitamos generar tu CV en formato oficial UNI. ¿Cómo prefieres hacerlo?
-          </Text>
-        </View>
+        <OnboardingHeader 
+          icon="file-alt" 
+          title="Construyamos tu perfil" 
+          subtitle="¿Cómo prefieres hacerlo?" 
+        />
 
         <View style={styles.optionsContainer}>
           {/* Option A: AI Upload */}
@@ -132,12 +138,28 @@ export default function OnboardingCVStartScreen({ navigation }: Props) {
 
           {/* Option B: Manual */}
           <TouchableOpacity
-            style={[styles.manualButton, { borderColor: colors.border }]}
+            style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1 }]}
             onPress={handleManual}
+            activeOpacity={0.7}
           >
-            <Text style={[styles.manualButtonText, { color: colors.textSecondary, fontSize: typography.sizes.md }]}>
-              No tengo CV, quiero llenarlo manualmente paso a paso
-            </Text>
+            <View style={styles.cardContent}>
+              <View style={[styles.iconContainer, { backgroundColor: colors.chipBg }]}>
+                <MaterialCommunityIcons name="pencil-outline" size={32} color={colors.text} />
+              </View>
+              <View style={styles.textWrapper}>
+                <Text style={[styles.cardTitle, { color: colors.text, fontSize: typography.sizes.lg, fontFamily: typography.bold }]}>
+                  Llenar manualmente
+                </Text>
+                <Text style={[styles.cardDescription, { color: colors.textSecondary, fontSize: typography.sizes.sm }]}>
+                  Si no tienes un CV listo, puedes ingresar tus datos paso a paso.
+                </Text>
+              </View>
+            </View>
+            
+            <View style={[styles.uploadZone, { borderColor: colors.border, borderStyle: 'solid' }]}>
+              <Text style={[styles.uploadText, { color: colors.text }]}>Comenzar formulario</Text>
+              <FontAwesome5 name="arrow-right" size={14} color={colors.text} />
+            </View>
           </TouchableOpacity>
         </View>
       </View>
@@ -149,10 +171,15 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  topBar: {
+    paddingHorizontal: 24,
+    paddingTop: 16,
+    zIndex: 10,
+  },
   content: {
     flex: 1,
     padding: 24,
-    justifyContent: 'center',
+    paddingTop: 40,
   },
   header: {
     marginBottom: 40,
@@ -225,13 +252,6 @@ const styles = StyleSheet.create({
   uploadText: {
     fontSize: 14,
     fontWeight: '500',
-  },
-  manualButton: {
-    padding: 16,
-    alignItems: 'center',
-  },
-  manualButtonText: {
-    textDecorationLine: 'underline',
   },
   processingTitle: {
     textAlign: 'center',

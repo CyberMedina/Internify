@@ -167,7 +167,11 @@ export default function ProfileScreen() {
 
         {/* Menu list (single continuous block) */}
         <View style={{ marginTop: spacing(2), backgroundColor: colors.surface }}>
-          <Row label={t('profile.settings')} icon="settings" />
+          <Row 
+            label={t('profile.settings')} 
+            icon="settings" 
+            onPress={() => (navigation as any).navigate('Settings')}
+          />
           <Row label={t('profile.privacyPolicy')} icon="shield" />
           <Row label={t('profile.helpCenter')} icon="help-circle" />
         </View>

@@ -1,7 +1,8 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import HomeStack from './HomeStack';
-import SavedScreen from '../screens/SavedScreen';
+import ApplicationsStack from './ApplicationsStack';
+import SavedStack from './SavedStack';
 import { View, Text } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -38,12 +39,13 @@ export default function Tabs() {
       }}
     >
       <Tab.Screen
-        name={t('tabs.home')}
+        name="HomeTab" 
         component={HomeStack}
         options={({ route }) => {
           const routeName = getFocusedRouteNameFromRoute(route) ?? 'HomeMain';
           const hideTab = routeName === 'ApplicationSuccess' || routeName === 'ProfileMain' || routeName === 'MyApplications' || routeName === 'MyProfile' || routeName === 'ApplicationStatus' || routeName === 'Notifications';
           return {
+            title: t('tabs.home'),
             tabBarIcon: ({ color, size }) => <Feather name="home" size={size} color={color} />,
             tabBarStyle: hideTab
               ? { display: 'none' }
@@ -52,17 +54,28 @@ export default function Tabs() {
         }}
       />
       <Tab.Screen
-        name="MyApplications"
-        component={MyApplicationsScreen}
-        options={{ 
-          title: 'Postulaciones',
-          tabBarIcon: ({ color, size }) => <Feather name="briefcase" size={size} color={color} /> 
+        name="ApplicationsStack"
+        component={ApplicationsStack}
+        options={({ route }) => {
+          // Hide tab bar on ApplicationStatus screen
+          const routeName = getFocusedRouteNameFromRoute(route) ?? 'MyApplications';
+          const hideTab = routeName === 'ApplicationStatus';
+          
+          return {
+            title: t('applications.title'), // Postulaciones
+            tabBarIcon: ({ color, size }) => <Feather name="briefcase" size={size} color={color} />,
+            tabBarStyle: hideTab ? { display: 'none' } : undefined,
+            headerShown: false // Ensure header is hidden as stack handles it or screens do
+          };
         }}
       />
       <Tab.Screen
-        name={t('tabs.saved')}
-        component={SavedScreen}
-        options={{ tabBarIcon: ({ color, size }) => <Feather name="bookmark" size={size} color={color} /> }}
+        name="SavedStack"
+        component={SavedStack}
+        options={{ 
+          title: t('tabs.saved'),
+          tabBarIcon: ({ color, size }) => <Feather name="bookmark" size={size} color={color} /> 
+        }}
       />
     </Tab.Navigator>
   );

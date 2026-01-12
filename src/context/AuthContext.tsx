@@ -1,7 +1,11 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
+import React, { createContext, useState, useContext, useEffect, useCallback, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LoginUserData, StudentProfile } from '../types/auth';
 import { notificationService } from '../services/notificationService';
+import { authEvents } from '../utils/authEvents';
+import { useToast } from './ToastContext';
+import { api } from '../services/api';
+import { navigationRef } from '../navigation/navigationRef';
 
 interface AuthContextType {
   userToken: string | null;
@@ -20,6 +24,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [userData, setUserData] = useState<LoginUserData | null>(null);
   const [studentProfile, setStudentProfile] = useState<StudentProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const { showToast } = useToast();
+  const isHandlingUnauthorizedRef = useRef(false);
 
   useEffect(() => {
     const loadStorageData = async () => {
@@ -60,6 +66,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log('[AuthContext] Login called with token:', token);
       console.log('[AuthContext] Login user data:', data);
       
+      isHandlingUnauthorizedRef.current = false;
+
       setUserToken(token);
       setUserData(data);
       await AsyncStorage.setItem('userToken', token);
@@ -70,7 +78,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     try {
       if (userToken) {
         await notificationService.unregisterDevice(userToken);
@@ -81,10 +89,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await AsyncStorage.removeItem('userToken');
       await AsyncStorage.removeItem('userData');
       await AsyncStorage.removeItem('studentProfile');
+
+      // Force navigation to Login
+      if (navigationRef.isReady()) {
+        navigationRef.reset({
+          index: 0,
+          routes: [{ name: 'Login' }],
+        });
+      }
     } catch (e) {
       console.error('Failed to remove auth data', e);
     }
-  };
+  }, [userToken]);
+
+  useEffect(() => {
+    const unsubscribe = authEvents.on('UNAUTHORIZED', async () => {
+      if (isHandlingUnauthorizedRef.current) {
+        return;
+      }
+      isHandlingUnauthorizedRef.current = true;
+      
+      console.log('[AuthContext] Session expired, logging out...');
+      await logout();
+      showToast('Tu sesión ha expirado. Por favor, inicia sesión nuevamente.', 'warning');
+    });
+    return unsubscribe;
+  }, [logout, showToast]);
 
   const fetchStudentProfile = async () => {
     if (!userToken) {
@@ -94,34 +124,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     
     try {
       console.log('[AuthContext] Fetching student profile...');
-      // Use the same base URL as in LoginScreen, ideally this should be in a config file
-      const BASE_URL = 'https://overfoul-domingo-unharmable.ngrok-free.dev'; 
-      const response = await fetch(`${BASE_URL}/api/student/profile`, {
-        headers: {
-          'Authorization': `Bearer ${userToken}`,
-          'Accept': 'application/json',
-        },
-      });
+      const response = await api.get<{ data: StudentProfile }>('/student/profile', { token: userToken });
 
-      console.log('[AuthContext] Profile fetch status:', response.status);
-
-      if (response.ok) {
-        const json = await response.json();
-        console.log('[AuthContext] Profile data received:', json ? 'YES' : 'NO');
-        if (json.data) {
-          // Fix image URL if it comes from local dev environment
-          if (json.data.profile && json.data.profile.photo) {
-             json.data.profile.photo = json.data.profile.photo.replace(
-               'https://internifyutesis.test:8443', 
-               'https://overfoul-domingo-unharmable.ngrok-free.dev'
-             );
-          }
-          
-          setStudentProfile(json.data);
-          await AsyncStorage.setItem('studentProfile', JSON.stringify(json.data));
+      console.log('[AuthContext] Profile data received:', response ? 'YES' : 'NO');
+      if (response.data) {
+        // Fix image URL if it comes from local dev environment
+        if (response.data.profile && response.data.profile.photo) {
+           response.data.profile.photo = response.data.profile.photo.replace(
+             'https://internifyutesis.test:8443', 
+             'https://overfoul-domingo-unharmable.ngrok-free.dev'
+           );
         }
-      } else {
-        console.error('Failed to fetch student profile:', response.status);
+        
+        setStudentProfile(response.data);
+        await AsyncStorage.setItem('studentProfile', JSON.stringify(response.data));
       }
     } catch (error) {
       console.error('Error fetching student profile:', error);

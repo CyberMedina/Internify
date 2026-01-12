@@ -6,8 +6,10 @@ import AvatarGroup from './AvatarGroup';
 import { Feather } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useSaved } from '../context/SavedContext';
+import { useApplications } from '../context/ApplicationsContext';
 import { useI18n } from '../i18n/i18n';
 import { getInitials } from '../utils/stringUtils';
+import BookmarkButton from './BookmarkButton';
 
 export type Job = {
   id: string;
@@ -20,15 +22,20 @@ export type Job = {
   avatars: string[];
   companyLogo?: string;
   postedTime?: string;
+  isApplied?: boolean;
+  isSaved?: boolean;
 };
 
 type Props = { job: Job };
 
 const JobCardLarge = memo(({ job }: Props) => {
-  const { colors, spacing, radius, typography } = useTheme();
+  const { colors, spacing, radius, typography, isDark } = useTheme();
   const navigation = useNavigation<any>();
   const savedCtx = useSaved();
+  const applicationsCtx = useApplications();
   const isSaved = savedCtx?.isSaved(job.id) ?? false;
+  const isLoading = savedCtx?.isProcessing(job.id) ?? false;
+  const isApplied = job.isApplied || applicationsCtx.hasApplied(job.id);
   const { t } = useI18n();
 
   // Debug log
@@ -61,14 +68,25 @@ const JobCardLarge = memo(({ job }: Props) => {
             <Text numberOfLines={1} style={{ color: colors.textSecondary, marginTop: 2 }}>{job.company}</Text>
           </View>
         </View>
-        <TouchableOpacity onPress={savedCtx ? () => savedCtx.toggle(job) : undefined} disabled={!savedCtx} style={{ padding: 6 }}>
-          <Feather name="bookmark" size={20} color={isSaved ? colors.primary : colors.textSecondary} />
-        </TouchableOpacity>
+        <BookmarkButton 
+          isSaved={isSaved} 
+          isLoading={isLoading}
+          onToggle={savedCtx ? () => savedCtx.toggle(job) : () => {}} 
+          size={20} 
+          style={{ padding: 6 }}
+        />
       </View>
 
       <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: spacing(1) }}>
         <Feather name="map-pin" size={14} color={colors.textSecondary} />
         <Text style={{ color: colors.textSecondary, marginLeft: 4, fontSize: typography.sizes.sm }}>{job.location}</Text>
+        
+        {isApplied && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 10, backgroundColor: isDark ? 'rgba(16, 185, 129, 0.2)' : '#D1FAE5', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 }}>
+                <Feather name="check-circle" size={12} color={isDark ? '#34D399' : '#059669'} />
+                <Text style={{ fontSize: 11, color: isDark ? '#34D399' : '#059669', marginLeft: 4, fontWeight: '700' }}>Aplicado</Text>
+            </View>
+        )}
       </View>
 
       <View

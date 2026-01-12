@@ -7,10 +7,12 @@ import RootStack from 'src/navigation/RootStack';
 import { SavedProvider } from 'src/context/SavedContext';
 import { AuthProvider } from 'src/context/AuthContext';
 import { I18nProvider } from 'src/i18n/i18n';
+import { ApplicationsProvider } from 'src/context/ApplicationsContext';
 import * as Notifications from 'expo-notifications';
 import { registerForPushNotificationsAsync } from 'src/utils/notifications';
-
-export const navigationRef = createNavigationContainerRef<any>();
+import { ErrorBoundary } from 'src/components/ErrorBoundary';
+import { ToastProvider } from 'src/context/ToastContext';
+import { navigationRef } from 'src/navigation/navigationRef';
 
 function Root() {
   const { isDark } = useTheme();
@@ -20,7 +22,7 @@ function Root() {
   const responseListener = useRef<Notifications.Subscription>();
 
   useEffect(() => {
-    registerForPushNotificationsAsync().then(token => token && setExpoPushToken(token));
+    // registerForPushNotificationsAsync().then(token => token && setExpoPushToken(token));
 
     notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
       setNotification(notification);
@@ -49,8 +51,8 @@ function Root() {
     });
 
     return () => {
-      notificationListener.current && Notifications.removeNotificationSubscription(notificationListener.current);
-      responseListener.current && Notifications.removeNotificationSubscription(responseListener.current);
+      notificationListener.current && notificationListener.current.remove();
+      responseListener.current && responseListener.current.remove();
     };
   }, []);
 
@@ -65,15 +67,21 @@ function Root() {
 export default function App() {
   return (
     <SafeAreaProvider>
-      <ThemeProvider>
-        <I18nProvider>
-          <AuthProvider>
-            <SavedProvider>
-              <Root />
-            </SavedProvider>
-          </AuthProvider>
-        </I18nProvider>
-      </ThemeProvider>
+      <ErrorBoundary>
+        <ThemeProvider>
+          <I18nProvider>
+            <ToastProvider>
+              <AuthProvider>
+                <ApplicationsProvider>
+                  <SavedProvider>
+                    <Root />
+                  </SavedProvider>
+                </ApplicationsProvider>
+              </AuthProvider>
+            </ToastProvider>
+          </I18nProvider>
+        </ThemeProvider>
+      </ErrorBoundary>
     </SafeAreaProvider>
   );
 }

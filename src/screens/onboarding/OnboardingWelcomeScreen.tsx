@@ -13,6 +13,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import ScreenContainer from '../../components/ScreenContainer';
 import { useTheme } from '../../theme/ThemeContext';
+import GradientButton from '../../components/GradientButton';
 import { useAuth } from '../../context/AuthContext';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { OnboardingStackParamList } from '../../navigation/OnboardingStack';
@@ -87,19 +88,13 @@ export default function OnboardingWelcomeScreen({ navigation }: Props) {
         </View>
 
         <Animated.View entering={FadeInUp.delay(700).duration(600)} style={{ width: '100%' }}>
-          <TouchableOpacity
-            activeOpacity={1}
-            onPressIn={handlePressIn}
-            onPressOut={handlePressOut}
+          <GradientButton
             onPress={() => navigation.navigate('PersonalData')}
-          >
-            <Animated.View style={[styles.button, { backgroundColor: colors.primary }, buttonAnimatedStyle]}>
-              <Text style={[styles.buttonText, { color: '#FFF', fontSize: typography.sizes.md, fontFamily: typography.medium }]}>
-                Comenzar
-              </Text>
-              <FontAwesome5 name="arrow-right" size={16} color="#FFF" style={{ marginLeft: 8 }} />
-            </Animated.View>
-          </TouchableOpacity>
+            title="Comenzar"
+            icon={<FontAwesome5 name="arrow-right" size={16} color="#FFF" />}
+            iconPosition="right"
+            style={{ height: 56 }}
+          />
         </Animated.View>
       </View>
     </ScreenContainer>

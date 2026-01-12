@@ -3,7 +3,9 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-nati
 import { FontAwesome5 } from '@expo/vector-icons';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, FadeInDown } from 'react-native-reanimated';
 import ScreenContainer from '../../components/ScreenContainer';
+import OnboardingHeader from '../../components/OnboardingHeader';
 import { useTheme } from '../../theme/ThemeContext';
+import GradientButton from '../../components/GradientButton';
 import { useAuth } from '../../context/AuthContext';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { OnboardingStackParamList } from '../../navigation/OnboardingStack';
@@ -34,20 +36,18 @@ export default function OnboardingAcademicScreen({ navigation }: Props) {
       <ScrollView contentContainerStyle={styles.scrollContent}>
         
         {/* Header & Progress */}
-        <View style={styles.header}>
-          <Text style={[styles.headerTitle, { color: colors.text, fontSize: typography.sizes.xl, fontFamily: typography.bold }]}>
-            Tu perfil académico
-          </Text>
-          <View style={styles.progressContainer}>
-            <View style={[styles.progressBarBg, { backgroundColor: colors.border }]}>
-              <Animated.View style={[styles.progressBarFill, { backgroundColor: colors.primary }, progressStyle]} />
-            </View>
-            <Text style={[styles.progressText, { color: colors.textSecondary, fontSize: typography.sizes.xs }]}>
-              50% completado
-            </Text>
+        <OnboardingHeader 
+          icon="graduation-cap" 
+          title="Tu perfil académico" 
+          subtitle="Para mostrarte las mejores ofertas, confirmemos qué estás estudiando." 
+        />
+
+        <View style={styles.progressContainer}>
+          <View style={[styles.progressBarBg, { backgroundColor: colors.border }]}>
+            <Animated.View style={[styles.progressBarFill, { backgroundColor: colors.primary }, progressStyle]} />
           </View>
-          <Text style={[styles.description, { color: colors.textSecondary, fontSize: typography.sizes.md }]}>
-            Para mostrarte las mejores ofertas, confirmemos qué estás estudiando.
+          <Text style={[styles.progressText, { color: colors.textSecondary, fontSize: typography.sizes.xs }]}>
+            50% completado
           </Text>
         </View>
 
@@ -88,15 +88,10 @@ export default function OnboardingAcademicScreen({ navigation }: Props) {
       </ScrollView>
 
       <View style={[styles.footer, { backgroundColor: colors.card, borderTopColor: colors.border }]}>
-        <TouchableOpacity
-          style={[styles.button, { backgroundColor: colors.primary }]}
+        <GradientButton
           onPress={handleConfirm}
-          activeOpacity={0.9}
-        >
-          <Text style={[styles.buttonText, { color: '#FFF', fontSize: typography.sizes.md, fontFamily: typography.medium }]}>
-            Confirmar perfil académico
-          </Text>
-        </TouchableOpacity>
+          title="Confirmar perfil académico"
+        />
       </View>
     </ScreenContainer>
   );

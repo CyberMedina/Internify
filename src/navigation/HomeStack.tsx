@@ -8,6 +8,7 @@ import MyProfileScreen from '../screens/MyProfileScreen';
 import ApplicationStatusScreen from '../screens/ApplicationStatusScreen';
 import SearchScreen from '../screens/SearchScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
+import SettingsScreen from '../screens/SettingsScreen';
 import { Application } from '../types/vacancy';
 
 export type HomeStackParamList = {
@@ -19,6 +20,7 @@ export type HomeStackParamList = {
   ApplicationStatus: { application: Application };
   Search: undefined;
   Notifications: undefined;
+  Settings: undefined;
 };
 
 const Stack = createNativeStackNavigator<HomeStackParamList>();
@@ -34,6 +36,7 @@ export default function HomeStack() {
       <Stack.Screen name="MyProfile" component={MyProfileScreen} />
       <Stack.Screen name="Search" component={SearchScreen} />
       <Stack.Screen name="Notifications" component={NotificationsScreen} />
+      <Stack.Screen name="Settings" component={SettingsScreen} />
     </Stack.Navigator>
   );
 }

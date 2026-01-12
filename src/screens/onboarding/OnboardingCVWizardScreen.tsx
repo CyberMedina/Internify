@@ -1,20 +1,32 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, KeyboardAvoidingView, Platform, Modal, Switch, Alert } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, KeyboardAvoidingView, Platform, Modal, Switch, Alert, BackHandler } from 'react-native';
 import { FontAwesome5, MaterialIcons, Ionicons } from '@expo/vector-icons';
-import Animated, { FadeInRight, FadeOutLeft, Layout } from 'react-native-reanimated';
+import Animated, { FadeInRight, FadeOutLeft, Layout, FadeInDown, FadeOut } from 'react-native-reanimated';
 import * as Clipboard from 'expo-clipboard';
 import ScreenContainer from '../../components/ScreenContainer';
+import OnboardingHeader from '../../components/OnboardingHeader';
 import { useTheme } from '../../theme/ThemeContext';
+import GradientButton from '../../components/GradientButton';
+import MonthYearPicker from '../../components/MonthYearPicker';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { OnboardingStackParamList } from '../../navigation/OnboardingStack';
 import { currentUser } from '../../mock/user';
+import { useAuth } from '../../context/AuthContext';
+import { skillService, Skill } from '../../services/skillService';
+import SkeletonChip from '../../components/skeletons/SkeletonChip';
 
 type Props = NativeStackScreenProps<OnboardingStackParamList, 'CVWizard'>;
 
 const STEPS = 7;
 
+const COMMON_LANGUAGES = [
+  "Español", "Inglés", "Francés", "Alemán", "Italiano", "Portugués", 
+  "Chino Mandarín", "Japonés", "Coreano", "Ruso", "Árabe", "Hindi", "Holandés"
+];
+
 export default function OnboardingCVWizardScreen({ navigation, route }: Props) {
   const { mode } = route.params;
+  const { userToken } = useAuth();
   const { colors, typography, spacing } = useTheme();
   const [currentStep, setCurrentStep] = useState(1);
   
@@ -26,17 +38,48 @@ export default function OnboardingCVWizardScreen({ navigation, route }: Props) {
   const [secondaryStartYear, setSecondaryStartYear] = useState('');
   const [secondaryEndMonth, setSecondaryEndMonth] = useState('');
   const [secondaryEndYear, setSecondaryEndYear] = useState('');
+  const [titleModalVisible, setTitleModalVisible] = useState(false);
+  const [validationModalVisible, setValidationModalVisible] = useState(false);
+  const [validationMessage, setValidationMessage] = useState('');
   const [experiences, setExperiences] = useState<any[]>([]);
+
+  // Refs for Step 2
+  const schoolRef = useRef<TextInput>(null);
+  const titleRef = useRef<TextInput>(null);
+
+  // Refs for Experience Modal
+  const expCompanyRef = useRef<TextInput>(null);
+  const expTitleRef = useRef<TextInput>(null);
+  const expDescriptionRef = useRef<TextInput>(null);
+
+  // Refs for Certification Modal
+  const certNameRef = useRef<TextInput>(null);
+  const certOrgRef = useRef<TextInput>(null);
+
   const [certifications, setCertifications] = useState<any[]>([]);
   const [skills, setSkills] = useState<string[]>([]);
   const [skillInput, setSkillInput] = useState('');
-  const [languages, setLanguages] = useState<{ language: string, level: string }[]>([]);
-  const [languageInput, setLanguageInput] = useState('');
-  const [languageLevel, setLanguageLevel] = useState('Básico');
+  const [suggestedSkills, setSuggestedSkills] = useState<Skill[]>([]);
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
+  const [skillSearchResults, setSkillSearchResults] = useState<Skill[]>([]);
+  const [isSearchingSkills, setIsSearchingSkills] = useState(false);
+  const [languages, setLanguages] = useState<{ id: number, language: string, level: string }[]>([
+    { id: 1, language: 'Español', level: 'Nativo' }
+  ]);
+  
+  // Language Modal State
+  const [languageModalVisible, setLanguageModalVisible] = useState(false);
+  const [editingLanguageId, setEditingLanguageId] = useState<number | null>(null);
+  const [newLanguage, setNewLanguage] = useState({ language: '', level: 'Básico' });
+  const [languageErrors, setLanguageErrors] = useState<any>({});
+  const [languageSuggestions, setLanguageSuggestions] = useState<string[]>([]);
+  const [showLanguageSuggestions, setShowLanguageSuggestions] = useState(false);
+
   const [references, setReferences] = useState([{ name: '', contact: '' }, { name: '', contact: '' }, { name: '', contact: '' }]);
 
   // Experience Modal State
   const [experienceModalVisible, setExperienceModalVisible] = useState(false);
+  const [editingExperienceId, setEditingExperienceId] = useState<number | null>(null);
   const [newExperience, setNewExperience] = useState({
     title: '',
     company: '',
@@ -51,6 +94,7 @@ export default function OnboardingCVWizardScreen({ navigation, route }: Props) {
 
   // Certification Modal State
   const [certModalVisible, setCertModalVisible] = useState(false);
+  const [editingCertId, setEditingCertId] = useState<number | null>(null);
   const [newCert, setNewCert] = useState({ name: '', organization: '', startMonth: '', startYear: '', endMonth: '', endYear: '' });
   const [certErrors, setCertErrors] = useState<any>({});
 
@@ -173,7 +217,92 @@ export default function OnboardingCVWizardScreen({ navigation, route }: Props) {
     }
   }, [mode, route.params]);
 
+  // Handle Android Back Button
+  useEffect(() => {
+    const backAction = () => {
+      if (currentStep > 1) {
+        setCurrentStep(currentStep - 1);
+        return true;
+      }
+      return false;
+    };
+
+    const backHandler = BackHandler.addEventListener(
+      'hardwareBackPress',
+      backAction
+    );
+
+    return () => backHandler.remove();
+  }, [currentStep]);
+
+  const handleSkipStep2 = () => {
+    // Clear all fields in step 2
+    setSecondarySchool('');
+    setSecondaryTitle('');
+    setSecondaryStartMonth('');
+    setSecondaryStartYear('');
+    setSecondaryEndMonth('');
+    setSecondaryEndYear('');
+    
+    // Close modal and proceed to next step
+    setValidationModalVisible(false);
+    setCurrentStep(currentStep + 1);
+  };
+
+  // Fetch Suggested Skills
+  useEffect(() => {
+    if (currentStep === 6 && userToken && suggestedSkills.length === 0) {
+      loadSuggestedSkills();
+    }
+  }, [currentStep, userToken]);
+
+  const loadSuggestedSkills = async () => {
+    setIsLoadingSuggestions(true);
+    try {
+      const suggestions = await skillService.getSuggestedSkills(userToken!);
+      setSuggestedSkills(suggestions);
+    } catch (error) {
+      console.error('Error loading suggested skills:', error);
+    } finally {
+      setIsLoadingSuggestions(false);
+    }
+  };
+
+  // Search Skills
+  const handleSearchSkills = async (text: string) => {
+    setSkillInput(text);
+    if (text.length >= 2 && userToken) {
+      setIsSearchingSkills(true);
+      try {
+        const results = await skillService.searchSkills(userToken, text);
+        // Filter out already selected skills
+        const filteredResults = results.filter(r => !skills.includes(r.name));
+        setSkillSearchResults(filteredResults);
+      } catch (error) {
+        console.error('Error searching skills:', error);
+      } finally {
+        setIsSearchingSkills(false);
+      }
+    } else {
+      setSkillSearchResults([]);
+    }
+  };
+
   const handleNext = () => {
+    if (currentStep === 2) {
+        // Validation for Step 2 (Academic Background)
+        const hasAnyData = secondarySchool || secondaryTitle || secondaryStartMonth || secondaryStartYear || secondaryEndMonth || secondaryEndYear;
+        
+        if (hasAnyData) {
+            const isComplete = secondarySchool && secondaryTitle && secondaryStartMonth && secondaryStartYear && secondaryEndMonth && secondaryEndYear;
+            if (!isComplete) {
+                setValidationMessage('Parece que empezaste a llenar tu información académica pero faltan algunos datos.');
+                setValidationModalVisible(true);
+                return;
+            }
+        }
+    }
+
     if (currentStep < STEPS) {
       setCurrentStep(currentStep + 1);
     } else {
@@ -250,13 +379,25 @@ export default function OnboardingCVWizardScreen({ navigation, route }: Props) {
         endDateISO = new Date(endYearInt, endMonthInt - 1, 1).toISOString();
     }
 
-    setExperiences([...experiences, { 
-      ...newExperience, 
-      dates: `${startDate} - ${endDate}`,
-      startDateISO,
-      endDateISO,
-      id: Date.now() 
-    }]);
+    if (editingExperienceId !== null) {
+        // Update existing experience
+        setExperiences(experiences.map(exp => exp.id === editingExperienceId ? {
+            ...exp,
+            ...newExperience,
+            dates: `${startDate} - ${endDate}`,
+            startDateISO,
+            endDateISO
+        } : exp));
+    } else {
+        // Add new experience
+        setExperiences([...experiences, { 
+            ...newExperience, 
+            dates: `${startDate} - ${endDate}`,
+            startDateISO,
+            endDateISO,
+            id: Date.now() 
+        }]);
+    }
     
     setNewExperience({
       title: '',
@@ -268,8 +409,24 @@ export default function OnboardingCVWizardScreen({ navigation, route }: Props) {
       isCurrent: false,
       description: ''
     });
+    setEditingExperienceId(null);
     setExperienceErrors({});
     setExperienceModalVisible(false);
+  };
+
+  const handleDeleteExperience = (id: number) => {
+    Alert.alert(
+        'Eliminar experiencia',
+        '¿Estás seguro de que quieres eliminar esta experiencia?',
+        [
+            { text: 'Cancelar', style: 'cancel' },
+            { 
+                text: 'Eliminar', 
+                style: 'destructive', 
+                onPress: () => setExperiences(experiences.filter(exp => exp.id !== id)) 
+            }
+        ]
+    );
   };
 
   const handleSaveCertification = () => {
@@ -298,15 +455,43 @@ export default function OnboardingCVWizardScreen({ navigation, route }: Props) {
     const endYearInt = parseInt(newCert.endYear, 10);
     const endDateISO = new Date(endYearInt, endMonthInt - 1, 1).toISOString();
 
-    setCertifications([...certifications, { 
-      ...newCert, 
-      startDateISO,
-      endDateISO,
-      id: Date.now() 
-    }]);
+    if (editingCertId !== null) {
+        // Update existing certification
+        setCertifications(certifications.map(cert => cert.id === editingCertId ? {
+            ...cert,
+            ...newCert,
+            startDateISO,
+            endDateISO
+        } : cert));
+    } else {
+        // Add new certification
+        setCertifications([...certifications, { 
+            ...newCert, 
+            startDateISO,
+            endDateISO,
+            id: Date.now() 
+        }]);
+    }
+
     setNewCert({ name: '', organization: '', startMonth: '', startYear: '', endMonth: '', endYear: '' });
+    setEditingCertId(null);
     setCertErrors({});
     setCertModalVisible(false);
+  };
+
+  const handleDeleteCertification = (id: number) => {
+    Alert.alert(
+        'Eliminar certificación',
+        '¿Estás seguro de que quieres eliminar esta certificación?',
+        [
+            { text: 'Cancelar', style: 'cancel' },
+            { 
+                text: 'Eliminar', 
+                style: 'destructive', 
+                onPress: () => setCertifications(certifications.filter(cert => cert.id !== id)) 
+            }
+        ]
+    );
   };
 
   const handleBack = () => {
@@ -321,27 +506,91 @@ export default function OnboardingCVWizardScreen({ navigation, route }: Props) {
     if (skillInput.trim()) {
       setSkills([...skills, skillInput.trim()]);
       setSkillInput('');
+      setSkillSearchResults([]);
     }
   };
 
-  const handleAddLanguage = () => {
-    if (languageInput.trim()) {
-      setLanguages([...languages, { language: languageInput.trim(), level: languageLevel }]);
-      setLanguageInput('');
-      setLanguageLevel('Básico');
+  const handleSaveLanguage = () => {
+    const errors: any = {};
+    if (!newLanguage.language.trim()) errors.language = 'El idioma es requerido';
+    
+    if (Object.keys(errors).length > 0) {
+      setLanguageErrors(errors);
+      return;
+    }
+
+    if (editingLanguageId !== null) {
+        setLanguages(languages.map(lang => lang.id === editingLanguageId ? {
+            ...lang,
+            ...newLanguage
+        } : lang));
+    } else {
+        setLanguages([...languages, { 
+            ...newLanguage, 
+            id: Date.now() 
+        }]);
+    }
+
+    setNewLanguage({ language: '', level: 'Básico' });
+    setEditingLanguageId(null);
+    setLanguageErrors({});
+    setLanguageModalVisible(false);
+  };
+
+  const handleDeleteLanguage = (id: number) => {
+    Alert.alert(
+        'Eliminar idioma',
+        '¿Estás seguro de que quieres eliminar este idioma?',
+        [
+            { text: 'Cancelar', style: 'cancel' },
+            { 
+                text: 'Eliminar', 
+                style: 'destructive', 
+                onPress: () => setLanguages(languages.filter(lang => lang.id !== id)) 
+            }
+        ]
+    );
+  };
+
+  const handleLanguageChange = (text: string) => {
+    setNewLanguage({ ...newLanguage, language: text });
+    if (text.length > 0) {
+      const filtered = COMMON_LANGUAGES.filter(lang => 
+        lang.toLowerCase().includes(text.toLowerCase())
+      );
+      setLanguageSuggestions(filtered);
+      setShowLanguageSuggestions(true);
+    } else {
+      setShowLanguageSuggestions(false);
     }
   };
 
-  const renderStep1 = () => (
+  const selectLanguage = (lang: string) => {
+    setNewLanguage({ ...newLanguage, language: lang });
+    setShowLanguageSuggestions(false);
+  };
+
+  const renderStep1 = () => {
+    const minLength = 20;
+    const maxLength = 120;
+    const currentLength = summary.length;
+    const isValid = currentLength >= minLength && currentLength <= maxLength;
+    const isError = currentLength > 0 && currentLength < minLength;
+    
+    return (
     <View>
-      <Text style={[styles.stepTitle, { color: colors.text, fontSize: typography.sizes.xl, fontFamily: typography.bold }]}>
-        ¿Quién eres como profesional?
-      </Text>
-      <Text style={[styles.stepDescription, { color: colors.textSecondary }]}>
-        Escribe un breve resumen. Menciona tu nivel, fortalezas e intereses.
-      </Text>
+      <OnboardingHeader 
+        icon="user-tie" 
+        title="¿Quién eres como profesional?" 
+        subtitle="Escribe un breve resumen. Menciona tu nivel, fortalezas e intereses."
+      />
       
-      <View style={[styles.textAreaContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+      <View style={[styles.textAreaContainer, { 
+        backgroundColor: colors.surface, 
+        borderColor: isError ? colors.error : (isValid ? colors.primary : colors.border),
+        borderWidth: isValid || isError ? 1.5 : 1,
+        paddingBottom: 8
+      }]}>
         <TextInput
           style={[styles.textArea, { color: colors.text }]}
           multiline
@@ -350,107 +599,126 @@ export default function OnboardingCVWizardScreen({ navigation, route }: Props) {
           placeholderTextColor={colors.textSecondary}
           value={summary}
           onChangeText={setSummary}
+          maxLength={maxLength}
         />
+        <View style={{ alignSelf: 'flex-end', marginTop: 4 }}>
+          <Text style={{ 
+            color: isError ? colors.error : (isValid ? colors.primary : colors.textSecondary), 
+            fontSize: 12,
+            fontWeight: isValid ? '600' : '400'
+          }}>
+            {currentLength} / {maxLength}
+          </Text>
+        </View>
       </View>
       
-      <TouchableOpacity style={[styles.aiButton, { backgroundColor: colors.chipBg }]}>
-        <MaterialIcons name="auto-awesome" size={16} color={colors.primary} />
-        <Text style={[styles.aiButtonText, { color: colors.primary }]}>Ayúdame a redactar</Text>
-      </TouchableOpacity>
+      {isError && (
+        <Animated.View entering={FadeInDown} exiting={FadeOut}>
+            <Text style={{ color: colors.error, fontSize: 12, marginTop: 4, marginLeft: 4 }}>
+            ⚠️ El resumen es muy corto (mínimo {minLength} caracteres)
+            </Text>
+        </Animated.View>
+      )}
     </View>
-  );
+  )};
 
   const renderStep2 = () => (
     <View>
-      <Text style={[styles.stepTitle, { color: colors.text, fontSize: typography.sizes.xl, fontFamily: typography.bold }]}>
-        Antecedentes Académicos
-      </Text>
-      <Text style={[styles.stepDescription, { color: colors.textSecondary }]}>
-        Un par de datos sobre tu educación secundaria.
-      </Text>
+      <OnboardingHeader 
+        icon="school" 
+        title="Antecedentes Académicos" 
+        subtitle="Un par de datos sobre tu educación secundaria."
+        optional
+      />
 
       <View style={styles.inputGroup}>
         <Text style={[styles.label, { color: colors.textSecondary }]}>CENTRO DE ESTUDIOS</Text>
         <TextInput
+          ref={schoolRef}
           style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
           value={secondarySchool}
           onChangeText={setSecondarySchool}
           placeholder="Ej. Instituto Nacional..."
           placeholderTextColor={colors.textSecondary}
+          returnKeyType="next"
+          onSubmitEditing={() => setTitleModalVisible(true)}
+          blurOnSubmit={false}
         />
       </View>
 
       <View style={styles.inputGroup}>
         <Text style={[styles.label, { color: colors.textSecondary }]}>TÍTULO OBTENIDO</Text>
-        <TextInput
-          style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
-          value={secondaryTitle}
-          onChangeText={setSecondaryTitle}
-          placeholder="Ej. Bachiller en Ciencias..."
-          placeholderTextColor={colors.textSecondary}
-        />
+        <TouchableOpacity
+          onPress={() => setTitleModalVisible(true)}
+          style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface, justifyContent: 'center', paddingVertical: 16 }]}
+        >
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text style={{ color: secondaryTitle ? colors.text : colors.textSecondary, fontSize: 16 }}>
+                    {secondaryTitle || "Selecciona tu título..."}
+                </Text>
+                <MaterialIcons name="arrow-drop-down" size={24} color={colors.textSecondary} />
+            </View>
+        </TouchableOpacity>
       </View>
 
-      <Text style={[styles.label, { color: colors.textSecondary }]}>FECHA DE INICIO</Text>
-      <View style={{ flexDirection: 'row', gap: 12, marginBottom: 12 }}>
-        <TextInput
-          style={[styles.input, { flex: 1, color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
-          value={secondaryStartMonth}
-          onChangeText={setSecondaryStartMonth}
-          placeholder="Mes (MM)"
-          placeholderTextColor={colors.textSecondary}
-          keyboardType="numeric"
-          maxLength={2}
-        />
-        <TextInput
-          style={[styles.input, { flex: 1, color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
-          value={secondaryStartYear}
-          onChangeText={setSecondaryStartYear}
-          placeholder="Año (YYYY)"
-          placeholderTextColor={colors.textSecondary}
-          keyboardType="numeric"
-          maxLength={4}
-        />
-      </View>
+      <MonthYearPicker
+        label="FECHA DE INICIO"
+        selectedMonth={secondaryStartMonth}
+        selectedYear={secondaryStartYear}
+        onMonthChange={setSecondaryStartMonth}
+        onYearChange={setSecondaryStartYear}
+      />
 
-      <Text style={[styles.label, { color: colors.textSecondary }]}>FECHA DE FIN</Text>
-      <View style={{ flexDirection: 'row', gap: 12, marginBottom: 20 }}>
-        <TextInput
-          style={[styles.input, { flex: 1, color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
-          value={secondaryEndMonth}
-          onChangeText={setSecondaryEndMonth}
-          placeholder="Mes (MM)"
-          placeholderTextColor={colors.textSecondary}
-          keyboardType="numeric"
-          maxLength={2}
-        />
-        <TextInput
-          style={[styles.input, { flex: 1, color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
-          value={secondaryEndYear}
-          onChangeText={setSecondaryEndYear}
-          placeholder="Año (YYYY)"
-          placeholderTextColor={colors.textSecondary}
-          keyboardType="numeric"
-          maxLength={4}
-        />
-      </View>
+      <MonthYearPicker
+        label="FECHA DE FIN"
+        selectedMonth={secondaryEndMonth}
+        selectedYear={secondaryEndYear}
+        onMonthChange={setSecondaryEndMonth}
+        onYearChange={setSecondaryEndYear}
+      />
     </View>
   );
 
   const renderStep3 = () => (
     <View>
-      <Text style={[styles.stepTitle, { color: colors.text, fontSize: typography.sizes.xl, fontFamily: typography.bold }]}>
-        Experiencia Relevante
-      </Text>
-      <Text style={[styles.stepDescription, { color: colors.textSecondary }]}>
-        Incluye trabajos anteriores, pasantías previas o proyectos académicos importantes.
-      </Text>
+      <OnboardingHeader 
+        icon="briefcase" 
+        title="Experiencia Relevante" 
+        subtitle="Incluye trabajos anteriores, pasantías previas o proyectos académicos importantes."
+        optional
+      />
 
       {experiences.map((exp, index) => (
-        <View key={index} style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <Text style={[styles.cardTitle, { color: colors.text }]}>{exp.title}</Text>
-          <Text style={[styles.cardSubtitle, { color: colors.textSecondary }]}>{exp.company} • {exp.dates}</Text>
-        </View>
+        <TouchableOpacity 
+            key={index} 
+            style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}
+            onPress={() => {
+                setNewExperience({
+                    title: exp.title,
+                    company: exp.company,
+                    startMonth: exp.startMonth,
+                    startYear: exp.startYear,
+                    endMonth: exp.endMonth,
+                    endYear: exp.endYear,
+                    isCurrent: exp.isCurrent,
+                    description: exp.description || ''
+                });
+                setEditingExperienceId(exp.id);
+                setExperienceErrors({});
+                setExperienceModalVisible(true);
+            }}
+        >
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.cardTitle, { color: colors.text }]}>{exp.title}</Text>
+            <Text style={[styles.cardSubtitle, { color: colors.textSecondary }]}>{exp.company} • {exp.dates}</Text>
+          </View>
+          <TouchableOpacity 
+            style={{ padding: 8 }}
+            onPress={() => handleDeleteExperience(exp.id)}
+          >
+            <FontAwesome5 name="trash-alt" size={16} color={colors.error} />
+          </TouchableOpacity>
+        </TouchableOpacity>
       ))}
 
       <TouchableOpacity 
@@ -466,6 +734,7 @@ export default function OnboardingCVWizardScreen({ navigation, route }: Props) {
             isCurrent: false,
             description: ''
           });
+          setEditingExperienceId(null);
           setExperienceErrors({});
           setExperienceModalVisible(true);
         }}
@@ -478,26 +747,51 @@ export default function OnboardingCVWizardScreen({ navigation, route }: Props) {
 
   const renderStep4 = () => (
     <View>
-      <Text style={[styles.stepTitle, { color: colors.text, fontSize: typography.sizes.xl, fontFamily: typography.bold }]}>
-        Certificaciones y Cursos
-      </Text>
-      <Text style={[styles.stepDescription, { color: colors.textSecondary }]}>
-        Agrega cursos, talleres o certificaciones que sumen valor a tu perfil.
-      </Text>
+      <OnboardingHeader 
+        icon="certificate" 
+        title="Certificaciones y Cursos"
+        subtitle="Agrega cursos, talleres o certificaciones que sumen valor a tu perfil."
+        optional
+      />
 
       {certifications.map((cert, index) => (
-        <View key={index} style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <Text style={[styles.cardTitle, { color: colors.text }]}>{cert.name}</Text>
-          <Text style={[styles.cardSubtitle, { color: colors.textSecondary }]}>
-            {cert.organization} • {cert.startMonth}/{cert.startYear} - {cert.endMonth}/{cert.endYear}
-          </Text>
-        </View>
+        <TouchableOpacity 
+            key={index} 
+            style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}
+            onPress={() => {
+                setNewCert({
+                    name: cert.name,
+                    organization: cert.organization,
+                    startMonth: cert.startMonth,
+                    startYear: cert.startYear,
+                    endMonth: cert.endMonth,
+                    endYear: cert.endYear
+                });
+                setEditingCertId(cert.id);
+                setCertErrors({});
+                setCertModalVisible(true);
+            }}
+        >
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.cardTitle, { color: colors.text }]}>{cert.name}</Text>
+            <Text style={[styles.cardSubtitle, { color: colors.textSecondary }]}>
+                {cert.organization} • {cert.startMonth}/{cert.startYear} - {cert.endMonth}/{cert.endYear}
+            </Text>
+          </View>
+          <TouchableOpacity 
+            style={{ padding: 8 }}
+            onPress={() => handleDeleteCertification(cert.id)}
+          >
+            <FontAwesome5 name="trash-alt" size={16} color={colors.error} />
+          </TouchableOpacity>
+        </TouchableOpacity>
       ))}
 
       <TouchableOpacity 
         style={[styles.addButton, { borderColor: colors.primary, borderStyle: 'dashed' }]}
         onPress={() => {
-          setNewCert({ name: '', organization: '', year: '' });
+          setNewCert({ name: '', organization: '', startMonth: '', startYear: '', endMonth: '', endYear: '' });
+          setEditingCertId(null);
           setCertErrors({});
           setCertModalVisible(true);
         }}
@@ -510,111 +804,102 @@ export default function OnboardingCVWizardScreen({ navigation, route }: Props) {
 
   const renderStep5 = () => (
     <View>
-      <Text style={[styles.stepTitle, { color: colors.text, fontSize: typography.sizes.xl, fontFamily: typography.bold }]}>
-        Idiomas
-      </Text>
-      <Text style={[styles.stepDescription, { color: colors.textSecondary }]}>
-        ¿Qué idiomas hablas y cuál es tu nivel de dominio?
-      </Text>
+      <OnboardingHeader 
+        icon="language" 
+        title="Idiomas" 
+        subtitle="¿Qué idiomas hablas y cuál es tu nivel de dominio?"
+      />
 
-      <View style={styles.inputGroup}>
-        <TextInput
-          style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
-          value={languageInput}
-          onChangeText={setLanguageInput}
-          placeholder="Ej. Inglés, Francés..."
-          placeholderTextColor={colors.textSecondary}
-        />
-      </View>
-
-      <Text style={[styles.label, { color: colors.textSecondary, marginBottom: 12 }]}>NIVEL</Text>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 24 }}>
-        {['Básico', 'Intermedio', 'Avanzado', 'Nativo'].map((level) => (
-          <TouchableOpacity
-            key={level}
-            onPress={() => setLanguageLevel(level)}
-            style={[
-              styles.levelChip,
-              { 
-                borderColor: languageLevel === level ? colors.primary : colors.border,
-                backgroundColor: languageLevel === level ? colors.primary + '20' : 'transparent'
-              }
-            ]}
+      {languages.map((lang, index) => (
+        <TouchableOpacity 
+            key={index} 
+            style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}
+            onPress={() => {
+                setNewLanguage({
+                    language: lang.language,
+                    level: lang.level
+                });
+                setEditingLanguageId(lang.id);
+                setLanguageErrors({});
+                setLanguageModalVisible(true);
+            }}
+        >
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.cardTitle, { color: colors.text }]}>{lang.language}</Text>
+            <Text style={[styles.cardSubtitle, { color: colors.textSecondary }]}>{lang.level}</Text>
+          </View>
+          <TouchableOpacity 
+            style={{ padding: 8 }}
+            onPress={() => handleDeleteLanguage(lang.id)}
           >
-            <Text style={{ 
-              color: languageLevel === level ? colors.primary : colors.textSecondary,
-              fontWeight: languageLevel === level ? 'bold' : 'normal'
-            }}>
-              {level}
-            </Text>
+            <FontAwesome5 name="trash-alt" size={16} color={colors.error} />
           </TouchableOpacity>
-        ))}
-      </View>
+        </TouchableOpacity>
+      ))}
 
       <TouchableOpacity 
-        onPress={handleAddLanguage} 
-        style={[
-          styles.button, 
-          { 
-            backgroundColor: 'transparent', 
-            borderWidth: 1, 
-            borderColor: colors.primary, 
-            height: 48, 
-            marginBottom: 24,
-            elevation: 0,
-            shadowOpacity: 0
-          }
-        ]}
+        style={[styles.addButton, { borderColor: colors.primary, borderStyle: 'dashed' }]}
+        onPress={() => {
+          setNewLanguage({ language: '', level: 'Básico' });
+          setEditingLanguageId(null);
+          setLanguageErrors({});
+          setLanguageModalVisible(true);
+        }}
       >
-        <FontAwesome5 name="plus" size={14} color={colors.primary} style={{ marginRight: 8 }} />
-        <Text style={{ color: colors.primary, fontWeight: 'bold' }}>Agregar Idioma</Text>
+        <FontAwesome5 name="plus" size={14} color={colors.primary} />
+        <Text style={[styles.addButtonText, { color: colors.primary }]}>Agregar Idioma</Text>
       </TouchableOpacity>
-
-      <View style={styles.languagesList}>
-        {languages.map((lang, index) => (
-          <View key={index} style={[styles.languageItem, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <View style={styles.languageInfo}>
-              <Text style={[styles.languageName, { color: colors.text }]}>{lang.language}</Text>
-              <View style={[styles.languageLevelBadge, { backgroundColor: colors.primary + '20' }]}>
-                <Text style={{ color: colors.primary, fontSize: 12, fontWeight: 'bold' }}>{lang.level}</Text>
-              </View>
-            </View>
-            <TouchableOpacity 
-              onPress={() => setLanguages(languages.filter((_, i) => i !== index))}
-              style={styles.deleteButton}
-            >
-              <FontAwesome5 name="trash-alt" size={18} color={colors.error || '#FF4444'} />
-            </TouchableOpacity>
-          </View>
-        ))}
-      </View>
     </View>
   );
 
   const renderStep6 = () => (
-    <View>
-      <Text style={[styles.stepTitle, { color: colors.text, fontSize: typography.sizes.xl, fontFamily: typography.bold }]}>
-        Tus Armas Secretas
-      </Text>
-      <Text style={[styles.stepDescription, { color: colors.textSecondary }]}>
-        ¿Qué herramientas dominas? (Software, Soft Skills, Tecnologías)
-      </Text>
+    <View style={{ zIndex: 100 }}>
+      <OnboardingHeader 
+        icon="tools" 
+        title="Tus Armas Secretas" 
+        subtitle="¿Qué herramientas dominas? (Software, Soft Skills, Tecnologías)"
+      />
 
-      <View style={[styles.inputGroup, { flexDirection: 'row', alignItems: 'center' }]}>
-        <TextInput
-          style={[styles.input, { flex: 1, color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
-          value={skillInput}
-          onChangeText={setSkillInput}
-          placeholder="Ej. Excel, Python..."
-          placeholderTextColor={colors.textSecondary}
-          onSubmitEditing={handleAddSkill}
-        />
-        <TouchableOpacity onPress={handleAddSkill} style={[styles.iconButton, { backgroundColor: colors.primary }]}>
-          <FontAwesome5 name="plus" size={16} color="#FFF" />
-        </TouchableOpacity>
+      <View style={{ zIndex: 1000 }}>
+        <View style={[styles.inputGroup, { flexDirection: 'row', alignItems: 'center' }]}>
+          <TextInput
+            style={[styles.input, { flex: 1, color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
+            value={skillInput}
+            onChangeText={handleSearchSkills}
+            placeholder="Ej. Excel, Python..."
+            placeholderTextColor={colors.textSecondary}
+            onSubmitEditing={handleAddSkill}
+          />
+          <TouchableOpacity onPress={handleAddSkill} style={[styles.iconButton, { backgroundColor: colors.primary }]}>
+            <FontAwesome5 name="plus" size={16} color="#FFF" />
+          </TouchableOpacity>
+        </View>
+
+        {/* Search Results Dropdown */}
+        {skillSearchResults.length > 0 && (
+          <View style={[styles.searchResultsContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <ScrollView keyboardShouldPersistTaps="handled" nestedScrollEnabled={true}>
+              {skillSearchResults.map((item) => (
+                <TouchableOpacity
+                  key={item.id}
+                  style={[styles.searchResultItem, { borderBottomColor: colors.border }]}
+                  onPress={() => {
+                    if (!skills.includes(item.name)) {
+                      setSkills([...skills, item.name]);
+                    }
+                    setSkillInput('');
+                    setSkillSearchResults([]);
+                  }}
+                >
+                  <Text style={{ color: colors.text }}>{item.name}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )}
       </View>
 
-      <View style={styles.chipsContainer}>
+      <View style={[styles.chipsContainer, { zIndex: 1 }]}>
         {skills.map((skill, index) => (
           <View key={index} style={[styles.chip, { backgroundColor: colors.chipBg }]}>
             <Text style={[styles.chipText, { color: colors.text }]}>{skill}</Text>
@@ -625,25 +910,54 @@ export default function OnboardingCVWizardScreen({ navigation, route }: Props) {
         ))}
       </View>
 
-      <Text style={[styles.label, { color: colors.textSecondary, marginTop: 24 }]}>SUGERENCIAS</Text>
-      <View style={styles.chipsContainer}>
-        {['Liderazgo', 'Trabajo en Equipo', 'AutoCAD', 'Scrum'].map((s) => (
-          <TouchableOpacity key={s} onPress={() => setSkills([...skills, s])} style={[styles.suggestionChip, { borderColor: colors.border }]}>
-            <Text style={{ color: colors.textSecondary }}>{s}</Text>
-          </TouchableOpacity>
-        ))}
+      <Text style={[styles.label, { color: colors.textSecondary, marginTop: 24, zIndex: 1 }]}>SUGERENCIAS</Text>
+      <View style={[styles.chipsContainer, { zIndex: 1 }]}>
+        {isLoadingSuggestions ? (
+          Array.from({ length: 6 }).map((_, i) => (
+            <SkeletonChip key={i} width={80 + Math.random() * 40} />
+          ))
+        ) : (
+          suggestedSkills.map((s) => (
+            <TouchableOpacity 
+              key={s.id} 
+              onPress={() => {
+                if (!skills.includes(s.name)) {
+                  setSkills([...skills, s.name]);
+                }
+              }} 
+              style={[
+                styles.suggestionChip, 
+                { borderColor: colors.border, flexDirection: 'row', alignItems: 'center' },
+                skills.includes(s.name) && { opacity: 0.5 }
+              ]}
+              disabled={skills.includes(s.name)}
+            >
+              <Text style={{ color: colors.textSecondary }}>{s.name}</Text>
+              {s.type === 'popular' && (
+                <FontAwesome5 name="fire" size={10} color={colors.primary} style={{ marginLeft: 4 }} />
+              )}
+            </TouchableOpacity>
+          ))
+        )}
       </View>
+
+      {skills.length < 3 && (
+        <Animated.View entering={FadeInDown} exiting={FadeOut} style={{ marginTop: 16 }}>
+            <Text style={{ color: colors.error, fontSize: 12 }}>
+            ⚠️ Agrega al menos 3 habilidades para continuar ({skills.length}/3)
+            </Text>
+        </Animated.View>
+      )}
     </View>
   );
 
   const renderStep7 = () => (
     <View>
-      <Text style={[styles.stepTitle, { color: colors.text, fontSize: typography.sizes.xl, fontFamily: typography.bold }]}>
-        Referencias
-      </Text>
-      <Text style={[styles.stepDescription, { color: colors.textSecondary }]}>
-        Necesitamos 3 personas que den fe de tu capacidad.
-      </Text>
+      <OnboardingHeader 
+        icon="users" 
+        title="Referencias" 
+        subtitle="Necesitamos 3 personas que den fe de tu capacidad."
+      />
 
       {references.map((ref, index) => (
         <View key={index} style={[styles.referenceBlock, { backgroundColor: colors.surface, borderColor: colors.border }]}>
@@ -686,121 +1000,108 @@ export default function OnboardingCVWizardScreen({ navigation, route }: Props) {
       visible={experienceModalVisible}
       onRequestClose={() => setExperienceModalVisible(false)}
     >
-      <View style={styles.modalOverlay}>
-        <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
-          <Text style={[styles.modalTitle, { color: colors.text }]}>Nueva Experiencia</Text>
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.modalOverlay}
+      >
+        <View style={[styles.modalContent, { backgroundColor: colors.card, maxHeight: '90%' }]}>
+          <Text style={[styles.modalTitle, { color: colors.text }]}>
+            {editingExperienceId !== null ? 'Editar Experiencia' : 'Nueva Experiencia'}
+          </Text>
           
-          <View style={{ marginBottom: 12 }}>
-            <TextInput
-              style={[styles.input, { color: colors.text, borderColor: experienceErrors.title ? 'red' : colors.border }]}
-              placeholder="Cargo / Título"
-              placeholderTextColor={colors.textSecondary}
-              value={newExperience.title}
-              onChangeText={(text) => setNewExperience({...newExperience, title: text})}
-            />
-            {experienceErrors.title && <Text style={styles.errorText}>{experienceErrors.title}</Text>}
-          </View>
-          
-          <View style={{ marginBottom: 12 }}>
-            <TextInput
-              style={[styles.input, { color: colors.text, borderColor: experienceErrors.company ? 'red' : colors.border }]}
-              placeholder="Empresa / Organización"
-              placeholderTextColor={colors.textSecondary}
-              value={newExperience.company}
-              onChangeText={(text) => setNewExperience({...newExperience, company: text})}
-            />
-            {experienceErrors.company && <Text style={styles.errorText}>{experienceErrors.company}</Text>}
-          </View>
-          
-          <Text style={[styles.label, { color: colors.textSecondary, marginTop: 8 }]}>FECHA DE INICIO</Text>
-          <View style={{ flexDirection: 'row', gap: 12, marginBottom: 12 }}>
-            <TextInput
-              style={[styles.input, { flex: 1, color: colors.text, borderColor: experienceErrors.startDate ? 'red' : colors.border }]}
-              placeholder="Mes (MM)"
-              placeholderTextColor={colors.textSecondary}
-              keyboardType="numeric"
-              maxLength={2}
-              value={newExperience.startMonth}
-              onChangeText={(text) => setNewExperience({...newExperience, startMonth: text})}
-            />
-            <TextInput
-              style={[styles.input, { flex: 1, color: colors.text, borderColor: experienceErrors.startDate ? 'red' : colors.border }]}
-              placeholder="Año (YYYY)"
-              placeholderTextColor={colors.textSecondary}
-              keyboardType="numeric"
-              maxLength={4}
-              value={newExperience.startYear}
-              onChangeText={(text) => setNewExperience({...newExperience, startYear: text})}
-            />
-          </View>
-          {experienceErrors.startDate && <Text style={[styles.errorText, { marginTop: -8, marginBottom: 8 }]}>{experienceErrors.startDate}</Text>}
-
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-            <Text style={{ color: colors.text }}>¿Trabajo actual?</Text>
-            <Switch
-              value={newExperience.isCurrent}
-              onValueChange={(val) => setNewExperience({...newExperience, isCurrent: val})}
-              trackColor={{ false: colors.border, true: colors.primary }}
-            />
-          </View>
-
-          {!newExperience.isCurrent && (
-            <>
-              <Text style={[styles.label, { color: colors.textSecondary }]}>FECHA DE FIN</Text>
-              <View style={{ flexDirection: 'row', gap: 12, marginBottom: 12 }}>
+          <ScrollView showsVerticalScrollIndicator={false}>
+            <View style={{ marginBottom: 12 }}>
                 <TextInput
-                  style={[styles.input, { flex: 1, color: colors.text, borderColor: experienceErrors.endDate ? 'red' : colors.border }]}
-                  placeholder="Mes (MM)"
-                  placeholderTextColor={colors.textSecondary}
-                  keyboardType="numeric"
-                  maxLength={2}
-                  value={newExperience.endMonth}
-                  onChangeText={(text) => setNewExperience({...newExperience, endMonth: text})}
+                ref={expCompanyRef}
+                style={[styles.input, { color: colors.text, borderColor: experienceErrors.company ? 'red' : colors.border }]}
+                placeholder="Empresa / Organización"
+                placeholderTextColor={colors.textSecondary}
+                value={newExperience.company}
+                onChangeText={(text) => setNewExperience({...newExperience, company: text})}
+                returnKeyType="next"
+                onSubmitEditing={() => expTitleRef.current?.focus()}
+                blurOnSubmit={false}
                 />
-                <TextInput
-                  style={[styles.input, { flex: 1, color: colors.text, borderColor: experienceErrors.endDate ? 'red' : colors.border }]}
-                  placeholder="Año (YYYY)"
-                  placeholderTextColor={colors.textSecondary}
-                  keyboardType="numeric"
-                  maxLength={4}
-                  value={newExperience.endYear}
-                  onChangeText={(text) => setNewExperience({...newExperience, endYear: text})}
-                />
-              </View>
-              {experienceErrors.endDate && <Text style={[styles.errorText, { marginTop: -8, marginBottom: 8 }]}>{experienceErrors.endDate}</Text>}
-            </>
-          )}
-          
-          <TextInput
-            style={[styles.input, { color: colors.text, borderColor: colors.border, marginBottom: 24, height: 100, textAlignVertical: 'top' }]}
-            placeholder="Descripción de responsabilidades..."
-            placeholderTextColor={colors.textSecondary}
-            multiline
-            numberOfLines={4}
-            value={newExperience.description}
-            onChangeText={(text) => setNewExperience({...newExperience, description: text})}
-          />
+                {experienceErrors.company && <Text style={styles.errorText}>{experienceErrors.company}</Text>}
+            </View>
 
-          <View style={styles.modalButtons}>
-            <TouchableOpacity 
-              style={[styles.modalButton, { backgroundColor: colors.border }]} 
-              onPress={() => {
-                setExperienceErrors({});
-                setExperienceModalVisible(false);
-              }}
-            >
-              <Text style={{ color: colors.text }}>Cancelar</Text>
-            </TouchableOpacity>
+            <View style={{ marginBottom: 12 }}>
+                <TextInput
+                ref={expTitleRef}
+                style={[styles.input, { color: colors.text, borderColor: experienceErrors.title ? 'red' : colors.border }]}
+                placeholder="Cargo / Título"
+                placeholderTextColor={colors.textSecondary}
+                value={newExperience.title}
+                onChangeText={(text) => setNewExperience({...newExperience, title: text})}
+                returnKeyType="next"
+                onSubmitEditing={() => expStartMonthRef.current?.focus()}
+                blurOnSubmit={false}
+                />
+                {experienceErrors.title && <Text style={styles.errorText}>{experienceErrors.title}</Text>}
+            </View>
             
-            <TouchableOpacity 
-              style={[styles.modalButton, { backgroundColor: colors.primary }]} 
-              onPress={handleSaveExperience}
-            >
-              <Text style={{ color: '#FFF', fontWeight: 'bold' }}>Guardar</Text>
-            </TouchableOpacity>
-          </View>
+            <MonthYearPicker
+              label="FECHA DE INICIO"
+              selectedMonth={newExperience.startMonth}
+              selectedYear={newExperience.startYear}
+              onMonthChange={(val) => setNewExperience({...newExperience, startMonth: val})}
+              onYearChange={(val) => setNewExperience({...newExperience, startYear: val})}
+              error={experienceErrors.startDate}
+            />
+
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                <Text style={{ color: colors.text }}>¿Trabajo actual?</Text>
+                <Switch
+                value={newExperience.isCurrent}
+                onValueChange={(val) => setNewExperience({...newExperience, isCurrent: val})}
+                trackColor={{ false: colors.border, true: colors.primary }}
+                />
+            </View>
+
+            {!newExperience.isCurrent && (
+                <MonthYearPicker
+                  label="FECHA DE FIN"
+                  selectedMonth={newExperience.endMonth}
+                  selectedYear={newExperience.endYear}
+                  onMonthChange={(val) => setNewExperience({...newExperience, endMonth: val})}
+                  onYearChange={(val) => setNewExperience({...newExperience, endYear: val})}
+                  error={experienceErrors.endDate}
+                />
+            )}
+            
+            <TextInput
+                ref={expDescriptionRef}
+                style={[styles.input, { color: colors.text, borderColor: colors.border, marginBottom: 24, height: 100, textAlignVertical: 'top' }]}
+                placeholder="Descripción de responsabilidades..."
+                placeholderTextColor={colors.textSecondary}
+                multiline
+                numberOfLines={4}
+                value={newExperience.description}
+                onChangeText={(text) => setNewExperience({...newExperience, description: text})}
+            />
+
+            <View style={styles.modalButtons}>
+                <TouchableOpacity 
+                style={[styles.modalButton, { backgroundColor: colors.border }]} 
+                onPress={() => {
+                    setExperienceErrors({});
+                    setEditingExperienceId(null);
+                    setExperienceModalVisible(false);
+                }}
+                >
+                <Text style={{ color: colors.text }}>Cancelar</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                style={[styles.modalButton, { backgroundColor: colors.primary }]} 
+                onPress={handleSaveExperience}
+                >
+                <Text style={{ color: '#FFF', fontWeight: 'bold' }}>Guardar</Text>
+                </TouchableOpacity>
+            </View>
+          </ScrollView>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 
@@ -811,96 +1112,290 @@ export default function OnboardingCVWizardScreen({ navigation, route }: Props) {
       visible={certModalVisible}
       onRequestClose={() => setCertModalVisible(false)}
     >
-      <View style={styles.modalOverlay}>
-        <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
-          <Text style={[styles.modalTitle, { color: colors.text }]}>Nueva Certificación</Text>
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.modalOverlay}
+      >
+        <View style={[styles.modalContent, { backgroundColor: colors.card, maxHeight: '90%' }]}>
+          <Text style={[styles.modalTitle, { color: colors.text }]}>
+            {editingCertId !== null ? 'Editar Certificación' : 'Nueva Certificación'}
+          </Text>
           
-          <View style={{ marginBottom: 12 }}>
-            <TextInput
-              style={[styles.input, { color: colors.text, borderColor: certErrors.name ? 'red' : colors.border }]}
-              placeholder="Nombre del Curso / Certificación"
-              placeholderTextColor={colors.textSecondary}
-              value={newCert.name}
-              onChangeText={(text) => setNewCert({...newCert, name: text})}
-            />
-            {certErrors.name && <Text style={styles.errorText}>{certErrors.name}</Text>}
-          </View>
-          
-          <View style={{ marginBottom: 12 }}>
-            <TextInput
-              style={[styles.input, { color: colors.text, borderColor: certErrors.organization ? 'red' : colors.border }]}
-              placeholder="Institución / Plataforma"
-              placeholderTextColor={colors.textSecondary}
-              value={newCert.organization}
-              onChangeText={(text) => setNewCert({...newCert, organization: text})}
-            />
-            {certErrors.organization && <Text style={styles.errorText}>{certErrors.organization}</Text>}
-          </View>
-          
-          <Text style={[styles.label, { color: colors.textSecondary, marginTop: 8 }]}>FECHA DE INICIO</Text>
-          <View style={{ flexDirection: 'row', gap: 12, marginBottom: 12 }}>
-            <TextInput
-              style={[styles.input, { flex: 1, color: colors.text, borderColor: certErrors.startDate ? 'red' : colors.border }]}
-              placeholder="Mes (MM)"
-              placeholderTextColor={colors.textSecondary}
-              keyboardType="numeric"
-              maxLength={2}
-              value={newCert.startMonth}
-              onChangeText={(text) => setNewCert({...newCert, startMonth: text})}
-            />
-            <TextInput
-              style={[styles.input, { flex: 1, color: colors.text, borderColor: certErrors.startDate ? 'red' : colors.border }]}
-              placeholder="Año (YYYY)"
-              placeholderTextColor={colors.textSecondary}
-              keyboardType="numeric"
-              maxLength={4}
-              value={newCert.startYear}
-              onChangeText={(text) => setNewCert({...newCert, startYear: text})}
-            />
-          </View>
-          {certErrors.startDate && <Text style={[styles.errorText, { marginTop: -8, marginBottom: 8 }]}>{certErrors.startDate}</Text>}
-
-          <Text style={[styles.label, { color: colors.textSecondary }]}>FECHA DE FIN</Text>
-          <View style={{ flexDirection: 'row', gap: 12, marginBottom: 24 }}>
-            <TextInput
-              style={[styles.input, { flex: 1, color: colors.text, borderColor: certErrors.endDate ? 'red' : colors.border }]}
-              placeholder="Mes (MM)"
-              placeholderTextColor={colors.textSecondary}
-              keyboardType="numeric"
-              maxLength={2}
-              value={newCert.endMonth}
-              onChangeText={(text) => setNewCert({...newCert, endMonth: text})}
-            />
-            <TextInput
-              style={[styles.input, { flex: 1, color: colors.text, borderColor: certErrors.endDate ? 'red' : colors.border }]}
-              placeholder="Año (YYYY)"
-              placeholderTextColor={colors.textSecondary}
-              keyboardType="numeric"
-              maxLength={4}
-              value={newCert.endYear}
-              onChangeText={(text) => setNewCert({...newCert, endYear: text})}
-            />
-          </View>
-          {certErrors.endDate && <Text style={[styles.errorText, { marginTop: -8, marginBottom: 8 }]}>{certErrors.endDate}</Text>}
-
-          <View style={styles.modalButtons}>
-            <TouchableOpacity 
-              style={[styles.modalButton, { backgroundColor: colors.border }]} 
-              onPress={() => {
-                setCertErrors({});
-                setCertModalVisible(false);
-              }}
-            >
-              <Text style={{ color: colors.text }}>Cancelar</Text>
-            </TouchableOpacity>
+          <ScrollView showsVerticalScrollIndicator={false}>
+            <View style={{ marginBottom: 12 }}>
+                <TextInput
+                ref={certNameRef}
+                style={[styles.input, { color: colors.text, borderColor: certErrors.name ? 'red' : colors.border }]}
+                placeholder="Nombre del Curso / Certificación"
+                placeholderTextColor={colors.textSecondary}
+                value={newCert.name}
+                onChangeText={(text) => setNewCert({...newCert, name: text})}
+                returnKeyType="next"
+                onSubmitEditing={() => certOrgRef.current?.focus()}
+                blurOnSubmit={false}
+                />
+                {certErrors.name && <Text style={styles.errorText}>{certErrors.name}</Text>}
+            </View>
             
-            <TouchableOpacity 
-              style={[styles.modalButton, { backgroundColor: colors.primary }]} 
-              onPress={handleSaveCertification}
+            <View style={{ marginBottom: 12 }}>
+                <TextInput
+                ref={certOrgRef}
+                style={[styles.input, { color: colors.text, borderColor: certErrors.organization ? 'red' : colors.border }]}
+                placeholder="Institución / Plataforma"
+                placeholderTextColor={colors.textSecondary}
+                value={newCert.organization}
+                onChangeText={(text) => setNewCert({...newCert, organization: text})}
+                returnKeyType="next"
+                onSubmitEditing={() => certStartMonthRef.current?.focus()}
+                blurOnSubmit={false}
+                />
+                {certErrors.organization && <Text style={styles.errorText}>{certErrors.organization}</Text>}
+            </View>
+            
+            <MonthYearPicker
+              label="FECHA DE INICIO"
+              selectedMonth={newCert.startMonth}
+              selectedYear={newCert.startYear}
+              onMonthChange={(val) => setNewCert({...newCert, startMonth: val})}
+              onYearChange={(val) => setNewCert({...newCert, startYear: val})}
+              error={certErrors.startDate}
+            />
+
+            <MonthYearPicker
+              label="FECHA DE FIN"
+              selectedMonth={newCert.endMonth}
+              selectedYear={newCert.endYear}
+              onMonthChange={(val) => setNewCert({...newCert, endMonth: val})}
+              onYearChange={(val) => setNewCert({...newCert, endYear: val})}
+              error={certErrors.endDate}
+            />
+
+            <View style={styles.modalButtons}>
+                <TouchableOpacity 
+                style={[styles.modalButton, { backgroundColor: colors.border }]} 
+                onPress={() => {
+                    setCertErrors({});
+                    setEditingCertId(null);
+                    setCertModalVisible(false);
+                }}
+                >
+                <Text style={{ color: colors.text }}>Cancelar</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                style={[styles.modalButton, { backgroundColor: colors.primary }]} 
+                onPress={handleSaveCertification}
+                >
+                <Text style={{ color: '#FFF', fontWeight: 'bold' }}>Guardar</Text>
+                </TouchableOpacity>
+            </View>
+          </ScrollView>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+
+  const renderLanguageModal = () => (
+    <Modal
+      animationType="slide"
+      transparent={true}
+      visible={languageModalVisible}
+      onRequestClose={() => setLanguageModalVisible(false)}
+    >
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.modalOverlay}
+      >
+        <View style={[styles.modalContent, { backgroundColor: colors.card, maxHeight: '90%' }]}>
+          <Text style={[styles.modalTitle, { color: colors.text }]}>
+            {editingLanguageId !== null ? 'Editar Idioma' : 'Nuevo Idioma'}
+          </Text>
+          
+          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+            <View style={{ marginBottom: 12, zIndex: 10 }}>
+                <TextInput
+                style={[styles.input, { color: colors.text, borderColor: languageErrors.language ? 'red' : colors.border }]}
+                placeholder="Idioma (Ej. Inglés)"
+                placeholderTextColor={colors.textSecondary}
+                value={newLanguage.language}
+                onChangeText={handleLanguageChange}
+                />
+                {languageErrors.language && <Text style={styles.errorText}>{languageErrors.language}</Text>}
+                
+                {showLanguageSuggestions && languageSuggestions.length > 0 && (
+                  <View style={{ 
+                    position: 'absolute', 
+                    top: '100%', 
+                    left: 0, 
+                    right: 0, 
+                    backgroundColor: colors.surface, 
+                    borderWidth: 1, 
+                    borderColor: colors.border,
+                    borderRadius: 8,
+                    maxHeight: 150,
+                    zIndex: 1000,
+                    elevation: 5
+                  }}>
+                    <ScrollView keyboardShouldPersistTaps="handled">
+                      {languageSuggestions.map((item, index) => (
+                        <TouchableOpacity 
+                          key={index} 
+                          style={{ padding: 12, borderBottomWidth: index === languageSuggestions.length - 1 ? 0 : 1, borderBottomColor: colors.border }}
+                          onPress={() => selectLanguage(item)}
+                        >
+                          <Text style={{ color: colors.text }}>{item}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </View>
+                )}
+            </View>
+            
+            <Text style={[styles.label, { color: colors.textSecondary, marginBottom: 12 }]}>NIVEL</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 24 }}>
+                {['Básico', 'Intermedio', 'Avanzado', 'Nativo'].map((level) => (
+                <TouchableOpacity
+                    key={level}
+                    onPress={() => setNewLanguage({...newLanguage, level})}
+                    style={[
+                    styles.levelChip,
+                    { 
+                        borderColor: newLanguage.level === level ? colors.primary : colors.border,
+                        backgroundColor: newLanguage.level === level ? colors.primary + '20' : 'transparent'
+                    }
+                    ]}
+                >
+                    <Text style={{ 
+                    color: newLanguage.level === level ? colors.primary : colors.textSecondary,
+                    fontWeight: newLanguage.level === level ? 'bold' : 'normal'
+                    }}>
+                    {level}
+                    </Text>
+                </TouchableOpacity>
+                ))}
+            </View>
+
+            <View style={styles.modalButtons}>
+                <TouchableOpacity 
+                style={[styles.modalButton, { backgroundColor: colors.border }]} 
+                onPress={() => {
+                    setLanguageErrors({});
+                    setEditingLanguageId(null);
+                    setLanguageModalVisible(false);
+                }}
+                >
+                <Text style={{ color: colors.text }}>Cancelar</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                style={[styles.modalButton, { backgroundColor: colors.primary }]} 
+                onPress={handleSaveLanguage}
+                >
+                <Text style={{ color: '#FFF', fontWeight: 'bold' }}>Guardar</Text>
+                </TouchableOpacity>
+            </View>
+          </ScrollView>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+
+  const renderTitleModal = () => (
+    <Modal
+      animationType="fade"
+      transparent={true}
+      visible={titleModalVisible}
+      onRequestClose={() => setTitleModalVisible(false)}
+    >
+      <TouchableOpacity 
+        style={styles.modalOverlay} 
+        activeOpacity={1} 
+        onPress={() => setTitleModalVisible(false)}
+      >
+        <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+          <Text style={[styles.modalTitle, { color: colors.text }]}>Selecciona tu título</Text>
+          {['Bachiller en Ciencias y Letras', 'Bachiller Técnico', 'Técnico Medio', 'Técnico Superior'].map((item) => (
+            <TouchableOpacity
+                key={item}
+                style={{ paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}
+                onPress={() => {
+                    setSecondaryTitle(item);
+                    setTitleModalVisible(false);
+                }}
             >
-              <Text style={{ color: '#FFF', fontWeight: 'bold' }}>Guardar</Text>
+                <Text style={{ color: colors.text, fontSize: 16 }}>{item}</Text>
+                {secondaryTitle === item && <Ionicons name="checkmark" size={20} color={colors.primary} />}
             </TouchableOpacity>
+          ))}
+          
+          {secondaryTitle !== '' && (
+            <TouchableOpacity
+                style={{ paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'center', alignItems: 'center' }}
+                onPress={() => {
+                    setSecondaryTitle('');
+                    setTitleModalVisible(false);
+                }}
+            >
+                <Text style={{ color: colors.error, fontSize: 16, fontWeight: '600' }}>Borrar selección</Text>
+            </TouchableOpacity>
+          )}
+
+          <TouchableOpacity
+            style={{ marginTop: 16, paddingVertical: 12, alignItems: 'center' }}
+            onPress={() => setTitleModalVisible(false)}
+          >
+            <Text style={{ color: colors.primary, fontWeight: 'bold' }}>Cancelar</Text>
+          </TouchableOpacity>
+        </View>
+      </TouchableOpacity>
+    </Modal>
+  );
+
+  const renderValidationModal = () => (
+    <Modal
+      animationType="fade"
+      transparent={true}
+      visible={validationModalVisible}
+      onRequestClose={() => setValidationModalVisible(false)}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={[styles.modalContent, { backgroundColor: colors.card, alignItems: 'center', padding: 32 }]}>
+          <View style={{ 
+            width: 72, 
+            height: 72, 
+            borderRadius: 36, 
+            backgroundColor: colors.primary + '15', 
+            justifyContent: 'center', 
+            alignItems: 'center',
+            marginBottom: 20
+          }}>
+            <FontAwesome5 name="clipboard-list" size={32} color={colors.primary} />
           </View>
+          
+          <Text style={[styles.modalTitle, { color: colors.text, textAlign: 'center', fontSize: 20, marginBottom: 12 }]}>
+            ¿Datos incompletos?
+          </Text>
+          
+          <Text style={{ color: colors.textSecondary, textAlign: 'center', marginBottom: 28, fontSize: 16, lineHeight: 24 }}>
+            {validationMessage} {'\n\n'}
+            Puedes completar la información ahora o saltar este paso si prefieres no incluirla.
+          </Text>
+          
+          <TouchableOpacity 
+            style={[styles.button, { backgroundColor: colors.primary, width: '100%', height: 50, marginBottom: 12 }]} 
+            onPress={() => setValidationModalVisible(false)}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.buttonText, { color: '#FFF' }]}>Completar información</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={[styles.button, { backgroundColor: 'transparent', width: '100%', height: 50, borderWidth: 1, borderColor: colors.border }]} 
+            onPress={handleSkipStep2}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.buttonText, { color: colors.textSecondary }]}>Omitir y continuar</Text>
+          </TouchableOpacity>
         </View>
       </View>
     </Modal>
@@ -949,8 +1444,15 @@ export default function OnboardingCVWizardScreen({ navigation, route }: Props) {
     <ScreenContainer safeTop safeBottom style={styles.container}>
       {renderExperienceModal()}
       {renderCertModal()}
+      {renderLanguageModal()}
+      {renderTitleModal()}
+      {renderValidationModal()}
       {renderJsonModal()}
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined} 
+        style={{ flex: 1 }}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0}
+      >
         <View style={styles.header}>
           <TouchableOpacity onPress={handleBack} style={styles.backButton}>
             <Ionicons name="arrow-back" size={24} color={colors.text} />
@@ -968,7 +1470,10 @@ export default function OnboardingCVWizardScreen({ navigation, route }: Props) {
           </View>
         </View>
 
-        <ScrollView contentContainerStyle={styles.content}>
+        <ScrollView 
+          contentContainerStyle={[styles.content, { paddingBottom: 120 }]} 
+          keyboardShouldPersistTaps="handled"
+        >
           <Animated.View 
             key={currentStep} 
             entering={FadeInRight} 
@@ -985,15 +1490,16 @@ export default function OnboardingCVWizardScreen({ navigation, route }: Props) {
         </ScrollView>
 
         <View style={[styles.footer, { backgroundColor: colors.card, borderTopColor: colors.border }]}>
-          <TouchableOpacity
-            style={[styles.button, { backgroundColor: colors.primary }]}
+          <GradientButton
             onPress={handleNext}
-          >
-            <Text style={[styles.buttonText, { color: '#FFF' }]}>
-              {currentStep === STEPS ? 'Finalizar' : 'Siguiente'}
-            </Text>
-            <FontAwesome5 name="arrow-right" size={16} color="#FFF" style={{ marginLeft: 8 }} />
-          </TouchableOpacity>
+            title={currentStep === STEPS ? 'Finalizar' : 'Siguiente'}
+            icon={<FontAwesome5 name="arrow-right" size={16} color="#FFF" />}
+            iconPosition="right"
+            disabled={
+              (currentStep === 1 && (summary.length < 20 || summary.length > 120)) ||
+              (currentStep === 6 && skills.length < 3)
+            }
+          />
         </View>
       </KeyboardAvoidingView>
     </ScreenContainer>
@@ -1259,5 +1765,21 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginBottom: 8,
     marginLeft: 4,
+  },
+  searchResultsContainer: {
+    position: 'absolute',
+    top: 60,
+    left: 0,
+    right: 0,
+    borderRadius: 12,
+    borderWidth: 1,
+    maxHeight: 200,
+    zIndex: 9999,
+    elevation: 100,
+    backgroundColor: 'white',
+  },
+  searchResultItem: {
+    padding: 12,
+    borderBottomWidth: 1,
   },
 });

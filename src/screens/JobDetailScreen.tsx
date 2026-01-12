@@ -3,6 +3,8 @@ import { View, Text, TouchableOpacity, ActivityIndicator, Modal, StyleSheet, Ima
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import SocialShare from 'react-native-share';
+import { getColors } from 'react-native-image-colors';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../theme/ThemeContext';
 import { Feather, FontAwesome5 } from '@expo/vector-icons';
 import ScreenContainer from '../components/ScreenContainer';
@@ -16,20 +18,29 @@ import { Alert } from 'react-native';
 import { getVacancyDetail, applyToVacancy, getMyApplications } from '../services/vacancyService';
 import { Vacancy, Application, ApplicationStatus } from '../types/vacancy';
 import { useAuth } from '../context/AuthContext';
+import { useSaved } from '../context/SavedContext';
+import { useApplications } from '../context/ApplicationsContext';
 import JobDetailSkeleton from './JobDetailSkeleton';
 import { getInitials } from '../utils/stringUtils';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { addRecentlyViewed } from '../utils/storage';
+import GradientButton from '../components/GradientButton';
+import BookmarkButton from '../components/BookmarkButton';
 
 export default function JobDetailScreen() {
-  const { colors, spacing, radius, typography } = useTheme();
+  const { colors, spacing, radius, typography, isDark } = useTheme();
   const navigation = useNavigation();
   const route = useRoute() as any;
   const job: Job = route.params?.job;
   const insets = useSafeAreaInsets();
   const { t } = useI18n();
   const { userToken, studentProfile } = useAuth();
+  const savedCtx = useSaved();
+  const applicationsCtx = useApplications();
+  const isSaved = savedCtx?.isSaved(job?.id || '') ?? false;
+  const isSaveProcessing = savedCtx?.isProcessing(job?.id || '') ?? false;
   const [tab, setTab] = React.useState<'about' | 'company'>('about');
+
   const [submitting, setSubmitting] = React.useState(false);
   const [checkingStatus, setCheckingStatus] = React.useState(false);
   const [showCVModal, setShowCVModal] = React.useState(false);
@@ -38,6 +49,7 @@ export default function JobDetailScreen() {
   const [loading, setLoading] = React.useState(true);
   const [sharing, setSharing] = React.useState(false);
   const isSharing = React.useRef(false);
+  const [dominantColor, setDominantColor] = React.useState<string>(colors.primary);
 
   React.useEffect(() => {
     if (job) {
@@ -64,6 +76,37 @@ export default function JobDetailScreen() {
     };
     fetchDetail();
   }, [job?.id, userToken]);
+
+  const companyLogo = vacancy?.company?.logo ?? vacancy?.company?.photo ?? job?.companyLogo;
+
+  React.useEffect(() => {
+    const fetchColors = async () => {
+      if (companyLogo) {
+        try {
+          const result = await getColors(companyLogo, {
+            fallback: '#E6232C',
+            cache: true,
+            key: companyLogo,
+          });
+          
+          if (Platform.OS === 'android') {
+            // @ts-ignore
+            setDominantColor(result.dominant || result.vibrant || '#E6232C');
+          } else {
+            // @ts-ignore
+            setDominantColor(result.primary || '#E6232C');
+          }
+        } catch (e) {
+          console.log('Error extracting colors', e);
+          setDominantColor(colors.primary);
+        }
+      } else {
+        setDominantColor(colors.primary);
+      }
+    };
+    
+    fetchColors();
+  }, [companyLogo, colors.primary]);
 
   if (loading && !vacancy) {
     return <JobDetailSkeleton />;
@@ -104,7 +147,7 @@ export default function JobDetailScreen() {
       case 'pending': return 'Pendiente';
       case 'accepted': return 'Aceptada';
       case 'rejected': return 'Rechazada';
-      case 'reviewed': return 'Revisado';
+      case 'reviewed': return 'CV Visto';
       default: return status || 'Postulado';
     }
   };
@@ -195,8 +238,23 @@ export default function JobDetailScreen() {
     }
   };
 
+  const bottomPadding = (!data.canApply && !data.hasApplied) ? spacing(26) : spacing(16);
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.card }}>
+      <LinearGradient
+        colors={isDark 
+          ? [`${dominantColor}40`, colors.card] 
+          : [`${dominantColor}26`, `${dominantColor}00`]
+        }
+        style={{
+          position: 'absolute',
+          left: 0,
+          right: 0,
+          top: 0,
+          height: '35%',
+        }}
+      />
       {/* Top actions (safe area) */}
       <View style={{ paddingHorizontal: spacing(2), paddingTop: insets.top + spacing(1), paddingBottom: spacing(1), flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
         <TouchableOpacity
@@ -206,9 +264,20 @@ export default function JobDetailScreen() {
           <Feather name="arrow-left" size={18} color={colors.text} />
         </TouchableOpacity>
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <TouchableOpacity style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' }}>
-            <Feather name="bookmark" size={18} color={colors.primary} />
-          </TouchableOpacity>
+          <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' }}>
+            <BookmarkButton
+              isSaved={isSaved}
+              isLoading={isSaveProcessing}
+              onToggle={() => {
+                if (job && savedCtx) {
+                  savedCtx.toggle(job);
+                }
+              }}
+              size={18}
+              color={dominantColor}
+              activeColor={dominantColor}
+            />
+          </View>
           {data.canApply && (
             <TouchableOpacity 
               onPress={handleShare}
@@ -225,51 +294,72 @@ export default function JobDetailScreen() {
         </View>
       </View>
 
-  <ScreenContainer scroll contentContainerStyle={{ paddingTop: spacing(2), paddingBottom: spacing(20) }}>
-        {/* Header card-like */}
-        <View style={{ backgroundColor: colors.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: spacing(2), paddingTop: spacing(4), paddingBottom: spacing(2) }}>
+  <ScreenContainer scroll contentContainerStyle={{ paddingTop: spacing(1), paddingBottom: bottomPadding }}>
+        {/* Header Section */}
+        <View style={{ paddingHorizontal: spacing(2), paddingTop: spacing(2), paddingBottom: spacing(2) }}>
           <View style={{ alignItems: 'center' }}>
-            <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: colors.chipBg, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-              {data.companyLogo ? (
-                <Image source={{ uri: data.companyLogo }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
-              ) : (
-                <Text style={{ color: colors.primary, fontWeight: '800', fontSize: 28 }}>{getInitials(data.company)}</Text>
-              )}
+            <View style={{ 
+              width: 80, height: 80, borderRadius: 40, 
+              backgroundColor: colors.surface, 
+              alignItems: 'center', justifyContent: 'center', 
+              shadowColor: dominantColor,
+              shadowOffset: { width: 0, height: 8 },
+              shadowOpacity: 0.3,
+              shadowRadius: 12,
+              elevation: 8,
+              marginBottom: spacing(2)
+            }}>
+              <View style={{ width: 80, height: 80, borderRadius: 40, overflow: 'hidden', backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' }}>
+                {data.companyLogo ? (
+                  <Image source={{ uri: data.companyLogo }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                ) : (
+                  <Text style={{ color: dominantColor, fontWeight: '800', fontSize: 32 }}>{getInitials(data.company)}</Text>
+                )}
+              </View>
             </View>
-            <Text style={{ marginTop: spacing(1), color: colors.text, fontWeight: '700', fontSize: typography.sizes.xl }}>{data.title}</Text>
-            <Text style={{ marginTop: 4, color: colors.textSecondary }}>{data.company}</Text>
+            
+            <Text style={{ 
+              marginTop: spacing(1), 
+              color: isDark ? '#FFFFFF' : '#1A1A1A', 
+              fontWeight: '800', 
+              fontSize: typography.sizes.xxl,
+              textAlign: 'center'
+            }}>{data.title}</Text>
+            
+            <Text style={{ marginTop: 4, color: colors.textSecondary, fontSize: typography.sizes.md, fontWeight: '600' }}>{data.company}</Text>
+            
             <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: spacing(1) }}>
-              <Feather name="map-pin" size={14} color={colors.primary} />
+              <Feather name="map-pin" size={14} color={dominantColor} />
               <Text style={{ marginLeft: 6, color: colors.textSecondary }}>{data.location}</Text>
             </View>
             {data.postedHuman && (
               <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
-                <Feather name="clock" size={14} color={colors.textSecondary} />
+                <Feather name="clock" size={14} color={colors.textSecondary} fontSize={12} />
                 <Text style={{ marginLeft: 6, color: colors.textSecondary, fontSize: 12 }}>{data.postedHuman}</Text>
               </View>
             )}
           </View>
 
           {/* Info tiles grid */}
-          <View style={{ marginTop: spacing(2), flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+          <View style={{ marginTop: spacing(3), flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}>
             {/* Salary */}
-            <View style={{ width: '48%', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing(1), marginBottom: spacing(1), shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 1 }}>
+            <View style={{ width: '48%', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing(1.5), marginBottom: spacing(1.5), shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 1 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                 <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: colors.chipBg, alignItems: 'center', justifyContent: 'center' }}>
-                  <Feather name="dollar-sign" size={14} color={colors.primary} />
+                  <Feather name="dollar-sign" size={14} color={dominantColor} />
                 </View>
                 <Text style={{ marginLeft: spacing(1), color: colors.textSecondary, fontSize: typography.sizes.xs }}>{t('detail.salaryMonthly')}</Text>
               </View>
               <Text style={{ marginTop: 6 }}>
-                <Text style={{ color: colors.primary, fontWeight: '700' }}>{data.salary}</Text>
+                <Text style={{ color: colors.text, fontWeight: '700' }}>{data.salary}</Text>
               </Text>
             </View>
 
             {/* Tipo de puesto */}
-            <View style={{ width: '48%', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing(1), marginBottom: spacing(1), shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 1 }}>
+            <View style={{ width: '48%', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing(1.5), marginBottom: spacing(1.5), shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 1 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                 <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: colors.chipBg, alignItems: 'center', justifyContent: 'center' }}>
-                  <Feather name="briefcase" size={14} color={colors.primary} />
+                  <Feather name="briefcase" size={14} color={dominantColor} />
                 </View>
                 <Text style={{ marginLeft: spacing(1), color: colors.textSecondary, fontSize: typography.sizes.xs }}>{t('detail.jobType')}</Text>
               </View>
@@ -279,10 +369,10 @@ export default function JobDetailScreen() {
             </View>
 
             {/* Modalidad */}
-            <View style={{ width: '48%', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing(1), marginBottom: spacing(1), shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 1 }}>
+            <View style={{ width: '48%', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing(1.5), marginBottom: spacing(1.5), shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 1 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                 <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: colors.chipBg, alignItems: 'center', justifyContent: 'center' }}>
-                  <Feather name="globe" size={14} color={colors.primary} />
+                  <Feather name="globe" size={14} color={dominantColor} />
                 </View>
                 <Text style={{ marginLeft: spacing(1), color: colors.textSecondary, fontSize: typography.sizes.xs }}>{t('detail.workingModel')}</Text>
               </View>
@@ -292,10 +382,10 @@ export default function JobDetailScreen() {
             </View>
 
             {/* Nivel */}
-            <View style={{ width: '48%', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing(1), marginBottom: spacing(1), shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 1 }}>
+            <View style={{ width: '48%', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing(1.5), marginBottom: spacing(1.5), shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 1 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                 <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: colors.chipBg, alignItems: 'center', justifyContent: 'center' }}>
-                  <Feather name="trending-up" size={14} color={colors.primary} />
+                  <Feather name="trending-up" size={14} color={dominantColor} />
                 </View>
                 <Text style={{ marginLeft: spacing(1), color: colors.textSecondary, fontSize: typography.sizes.xs }}>{t('detail.level')}</Text>
               </View>
@@ -307,7 +397,7 @@ export default function JobDetailScreen() {
         </View>
 
         {/* Tabs mock */}
-        <View style={{ backgroundColor: colors.surface, paddingHorizontal: spacing(2), paddingBottom: spacing(2) }}>
+        <View style={{ backgroundColor: colors.surface, marginHorizontal: spacing(2), borderRadius: 16, paddingHorizontal: spacing(2), paddingBottom: spacing(2), marginTop: spacing(1) }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-around', marginTop: spacing(2), borderBottomColor: colors.border, borderBottomWidth: 1 }}>
             {(
               [
@@ -316,9 +406,9 @@ export default function JobDetailScreen() {
               ] as const
             ).map(({ key, label }) => (
               <TouchableOpacity key={key} onPress={() => setTab(key)} style={{ paddingVertical: spacing(1) }}>
-                <Text style={{ color: tab === key ? colors.primary : colors.textSecondary, fontWeight: tab === key ? '700' as any : '600' }}>{label}</Text>
+                <Text style={{ color: tab === key ? colors.text : colors.textSecondary, fontWeight: tab === key ? '700' as any : '600' }}>{label}</Text>
                 {tab === key ? (
-                  <View style={{ height: 2, backgroundColor: colors.primary, marginTop: 6, borderRadius: 2 }} />
+                  <View style={{ height: 2, backgroundColor: dominantColor, marginTop: 6, borderRadius: 2 }} />
                 ) : (
                   <View style={{ height: 2, backgroundColor: 'transparent', marginTop: 6 }} />
                 )}
@@ -366,28 +456,33 @@ export default function JobDetailScreen() {
             onPress={async () => {
               if (checkingStatus) return;
               
+              const navigateToStatus = (app: any) => {
+                 (navigation as any).navigate('ApplicationStatus', { application: app });
+              };
+
               if (vacancy?.application?.id) {
                 const app = {
                   id: vacancy.application.id,
                   status: vacancy.application.status,
                   vacancy: vacancy
-                } as any;
-                (navigation as any).navigate('ApplicationStatus', { application: app });
+                };
+                navigateToStatus(app);
               } else {
                 try {
                   setCheckingStatus(true);
-                  const apps = await getMyApplications(userToken);
+                  const response = await getMyApplications(userToken);
+                  const apps = response.data || [];
                   const match = apps.find(a => a.vacancy_id === vacancy?.id);
                   
                   if (match) {
                     if (!match.vacancy) match.vacancy = vacancy as any;
-                    (navigation as any).navigate('ApplicationStatus', { application: match });
+                    navigateToStatus(match);
                   } else {
-                    (navigation as any).navigate('MyApplications');
+                    (navigation as any).navigate('MainTabs', { screen: 'ApplicationsStack', params: { screen: 'MyApplications' } });
                   }
                 } catch (e) {
                   console.error(e);
-                  (navigation as any).navigate('MyApplications');
+                  (navigation as any).navigate('MainTabs', { screen: 'ApplicationsStack', params: { screen: 'MyApplications' } });
                 } finally {
                   setCheckingStatus(false);
                 }
@@ -422,22 +517,17 @@ export default function JobDetailScreen() {
                 {data.rejectionReason || 'Tu perfil académico no coincide con los requisitos de esta vacante.'}
               </Text>
             </View>
-            <TouchableOpacity
-              style={{ backgroundColor: colors.primary, borderRadius: 28, alignItems: 'center', justifyContent: 'center', height: 56, flexDirection: 'row', opacity: sharing ? 0.7 : 1 }}
+            <GradientButton
               onPress={handleShare}
+              title={sharing ? 'Compartiendo...' : 'Compartir con un amigo'}
+              loading={sharing}
               disabled={sharing}
-            >
-              {sharing ? (
-                <ActivityIndicator size="small" color="#fff" style={{ marginRight: 8 }} />
-              ) : (
-                <Feather name="share-2" size={20} color="#fff" style={{ marginRight: 8 }} />
-              )}
-              <Text style={{ color: '#fff', fontWeight: '700' }}>{sharing ? 'Compartiendo...' : 'Compartir con un amigo'}</Text>
-            </TouchableOpacity>
+              icon={<Feather name="share-2" size={20} color="#fff" />}
+              gradientColors={[dominantColor, dominantColor]}
+            />
           </View>
         ) : (
-          <TouchableOpacity
-            activeOpacity={0.9}
+          <GradientButton
             onPress={async () => {
               if (!studentProfile?.has_cv) {
                 setShowCVModal(true);
@@ -465,6 +555,7 @@ export default function JobDetailScreen() {
                 setSubmitting(true);
                 if (userToken && vacancy?.id) {
                   await applyToVacancy(userToken, vacancy.id);
+                  await applicationsCtx.refreshApplications(); // Refresh context
                   (navigation as any).navigate('ApplicationSuccess');
                 }
               } catch (error: any) {
@@ -473,18 +564,11 @@ export default function JobDetailScreen() {
                 setSubmitting(false);
               }
             }}
-            style={{ backgroundColor: colors.primary, borderRadius: 28, alignItems: 'center', justifyContent: 'center', height: 56, opacity: submitting ? 0.7 : 1 }}
-            disabled={submitting}
-          >
-            {submitting ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <ActivityIndicator color="#fff" style={{ marginRight: 8 }} />
-                <Text style={{ color: '#fff', fontWeight: '700' }}>{t('common.sending')}</Text>
-              </View>
-            ) : (
-              <Text style={{ color: '#fff', fontWeight: '700' }}>{t('common.apply')}</Text>
-            )}
-          </TouchableOpacity>
+            title={submitting ? t('common.sending') : t('common.apply')}
+            loading={submitting}
+            style={{ height: 56 }}
+            gradientColors={[dominantColor, dominantColor]}
+          />
         )}
       </View>
 
@@ -509,15 +593,14 @@ export default function JobDetailScreen() {
             Para postularte a <Text style={{ fontWeight: 'bold', color: colors.text }}>{data.company}</Text> y desbloquear todas las vacantes, necesitamos generar tu CV profesional.
           </Text>
 
-          <TouchableOpacity
-            style={{ backgroundColor: colors.primary, width: '100%', paddingVertical: 18, borderRadius: 16, alignItems: 'center', marginBottom: spacing(2), shadowColor: colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 }}
+          <GradientButton
             onPress={() => {
               setShowCVModal(false);
               (navigation as any).navigate('Onboarding', { screen: 'CVStart' });
             }}
-          >
-            <Text style={{ color: '#FFF', fontWeight: 'bold', fontSize: 16 }}>Completar mi CV ahora</Text>
-          </TouchableOpacity>
+            title="Completar mi CV ahora"
+            style={{ marginBottom: spacing(2) }}
+          />
 
           <TouchableOpacity
             style={{ paddingVertical: 16 }}

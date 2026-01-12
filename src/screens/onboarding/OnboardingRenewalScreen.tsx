@@ -5,6 +5,7 @@ import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import ScreenContainer from '../../components/ScreenContainer';
 import { useTheme } from '../../theme/ThemeContext';
+import GradientButton from '../../components/GradientButton';
 import { OnboardingStackParamList } from '../../navigation/OnboardingStack';
 import { FontAwesome5 } from '@expo/vector-icons';
 
@@ -43,16 +44,12 @@ export default function OnboardingRenewalScreen({ navigation }: Props) {
         </Animated.View>
         
         <Animated.View entering={FadeInDown.delay(800).duration(800)} style={styles.buttonContainer}>
-           <TouchableOpacity
-            style={[styles.button, { backgroundColor: colors.primary }]}
+           <GradientButton
             onPress={() => navigation.navigate('Process')}
-            activeOpacity={0.9}
-          >
-            <Text style={[styles.buttonText, { color: '#FFF', fontFamily: typography.medium, fontSize: typography.sizes.md }]}>
-              Siguiente
-            </Text>
-            <FontAwesome5 name="arrow-right" size={16} color="#FFF" style={{ marginLeft: 8 }} />
-          </TouchableOpacity>
+            title="Siguiente"
+            icon={<FontAwesome5 name="arrow-right" size={16} color="#FFF" />}
+            iconPosition="right"
+          />
         </Animated.View>
       </View>
     </ScreenContainer>

@@ -5,11 +5,14 @@ import { FontAwesome5, Ionicons } from '@expo/vector-icons';
 import { WebView } from 'react-native-webview';
 import * as Device from 'expo-device';
 import ScreenContainer from '../components/ScreenContainer';
+import { api } from '../services/api';
 import { useTheme } from '../theme/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/RootStack';
 import { registerForPushNotificationsAsync } from '../utils/notifications';
+import * as Notifications from 'expo-notifications';
+import { getNotificationConsentGranted } from '../utils/storage';
 import Toast, { ToastType } from '../components/Toast';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Login'>;
@@ -40,8 +43,27 @@ export default function LoginScreen({ navigation }: Props) {
     try {
       console.log('[LoginScreen] Starting login process...');
       setIsAuthProcessing(true);
-      const token = await registerForPushNotificationsAsync();
-      console.log('[LoginScreen] Push Token obtenido para login:', token);
+      
+      let token = '';
+      const consentGranted = await getNotificationConsentGranted();
+      if (consentGranted) {
+          // Verificar permisos de sistema antes de intentar registrar
+          const { status } = await Notifications.getPermissionsAsync();
+          
+          if (status === 'granted') {
+             token = await registerForPushNotificationsAsync() || '';
+             console.log('[LoginScreen] Push Token obtenido para login:', token);
+          } else {
+             console.log('[LoginScreen] Permiso revocado o faltante. Redirigiendo a Consent.');
+             // Si el usuario dijo SI antes en la app, pero el sistema dice NO,
+             // redirigimos a la pantalla de consentimiento para manejarlo gracefully
+             setIsAuthProcessing(false);
+             navigation.replace('NotificationConsent');
+             return;
+          }
+      } else {
+          console.log('[LoginScreen] Push Token skipped (consent not granted)');
+      }
       
       const url = token 
         ? `${BASE_AUTH_URL}?expo_push_token=${encodeURIComponent(token)}`
@@ -124,26 +146,18 @@ export default function LoginScreen({ navigation }: Props) {
         
         // --- REGISTRO DE DISPOSITIVO (Opción 2) ---
         try {
-          const pushToken = await registerForPushNotificationsAsync();
-          if (pushToken) {
-            // Usamos la misma base URL que el auth, pero apuntando a /api/devices
-            const apiBaseUrl = BASE_AUTH_URL.split('/api/')[0]; 
-            
-            console.log('[LoginScreen] Registering device...');
-            await fetch(`${apiBaseUrl}/api/devices`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${data.token}`,
-                'Accept': 'application/json'
-              },
-              body: JSON.stringify({
+          const consentGranted = await getNotificationConsentGranted();
+          if (consentGranted) {
+            const pushToken = await registerForPushNotificationsAsync();
+            if (pushToken) {
+              console.log('[LoginScreen] Registering device...');
+              await api.post('/devices', {
                 expo_push_token: pushToken,
                 expo_token: pushToken, // Enviamos ambos para asegurar compatibilidad con el backend
                 device_name: Device.modelName || Device.osName // Enviamos el nombre del dispositivo
-              })
-            });
-            console.log('[LoginScreen] Dispositivo registrado exitosamente en /api/devices');
+              }, { token: data.token });
+              console.log('[LoginScreen] Dispositivo registrado exitosamente en /api/devices');
+            }
           }
         } catch (error) {
           console.error('[LoginScreen] Error registrando dispositivo:', error);

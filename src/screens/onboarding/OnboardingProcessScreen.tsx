@@ -8,6 +8,7 @@ import ScreenContainer from '../../components/ScreenContainer';
 import { OnboardingStackParamList } from '../../navigation/OnboardingStack';
 import { onboardingSteps } from '../../mock/onboardingSteps';
 import { useTheme } from '../../theme/ThemeContext';
+import GradientButton from '../../components/GradientButton';
 
 type Props = NativeStackScreenProps<OnboardingStackParamList, 'Process'>;
 
@@ -130,10 +131,17 @@ export default function OnboardingProcessScreen({ navigation }: Props) {
             {index < onboardingSteps.length - 1 ? (
               <Text style={styles.swipeText}>Desliza para ver más →</Text>
             ) : (
-              <TouchableOpacity onPress={handleFinish} style={styles.finishButton} activeOpacity={0.85}>
-                <Text style={[styles.finishButtonText, { color: item.colors[1] }]}>Comenzar</Text>
-                <FontAwesome5 name="arrow-right" size={14} color={item.colors[1]} style={{ marginLeft: 8 }} />
-              </TouchableOpacity>
+              <View style={{ width: 140 }}>
+                <GradientButton
+                  onPress={handleFinish}
+                  title="Comenzar"
+                  icon={<FontAwesome5 name="arrow-right" size={14} color={item.colors[1]} />}
+                  iconPosition="right"
+                  style={{ height: 44, borderRadius: 22 }}
+                  textStyle={{ fontSize: 15, color: item.colors[1] }}
+                  gradientColors={['#FFF', '#FFF']}
+                />
+              </View>
             )}
           </View>
         </LinearGradient>
