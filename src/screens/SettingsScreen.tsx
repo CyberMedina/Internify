@@ -277,27 +277,6 @@ export default function SettingsScreen() {
             icon="bell"
             value={notificationsEnabled}
             onValueChange={toggleNotifications}
-          />
-          <SettingsItem
-            label="Correo Electrónico"
-            icon="mail"
-            onPress={() => {}}
-            value="Solo importantes"
-            isLast
-          />
-        </SettingsSection>
-
-        <SettingsSection title="General">
-          <SettingsItem
-            label="Idioma"
-            icon="globe"
-            value="Español"
-            onPress={() => {}}
-          />
-          <SettingsItem
-            label="Ayuda y Soporte"
-            icon="help-circle"
-            onPress={() => {}}
             isLast
           />
         </SettingsSection>

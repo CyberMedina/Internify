@@ -18,27 +18,15 @@ export default function NotificationsScreen() {
     fetchNotifications,
     loadMore,
     refresh,
-    markAsRead,
     markAllAsRead,
-    deleteNotification,
     deleteAllNotifications,
     handleNotificationPress
   } = useNotifications();
 
   useEffect(() => {
     fetchNotifications();
+    markAllAsRead();
   }, []);
-
-  const handleMarkAllRead = () => {
-    Alert.alert(
-      'Marcar todas como leídas',
-      '¿Estás seguro de que quieres marcar todas las notificaciones como leídas?',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        { text: 'Sí', onPress: markAllAsRead }
-      ]
-    );
-  };
 
   const handleDeleteAll = () => {
     Alert.alert(
@@ -88,9 +76,6 @@ export default function NotificationsScreen() {
         {!item.read_at && (
           <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: colors.primary, marginBottom: 8 }} />
         )}
-        <TouchableOpacity onPress={() => deleteNotification(item.id)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-           <Feather name="trash-2" size={16} color={colors.textSecondary} />
-        </TouchableOpacity>
       </View>
     </TouchableOpacity>
   );
@@ -124,9 +109,6 @@ export default function NotificationsScreen() {
         </Text>
         
         <View style={{ flexDirection: 'row' }}>
-            <TouchableOpacity onPress={handleMarkAllRead} style={{ marginRight: 10 }}>
-                <Feather name="check-square" size={20} color={colors.text} />
-            </TouchableOpacity>
             <TouchableOpacity onPress={handleDeleteAll}>
                 <Feather name="trash-2" size={20} color={colors.text} />
             </TouchableOpacity>

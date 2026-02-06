@@ -1,8 +1,52 @@
+const PENDING_DEEPLINK_KEY = 'pending_deeplink';
+
+export const setPendingDeeplink = async (url: string | null) => {
+  try {
+    if (url) {
+      await AsyncStorage.setItem(PENDING_DEEPLINK_KEY, url);
+    } else {
+      await AsyncStorage.removeItem(PENDING_DEEPLINK_KEY);
+    }
+  } catch (e) {
+    // ignore
+  }
+};
+
+export const getPendingDeeplink = async (): Promise<string | null> => {
+  try {
+    const url = await AsyncStorage.getItem(PENDING_DEEPLINK_KEY);
+    return url || null;
+  } catch (e) {
+    return null;
+  }
+};
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Job } from '../components/JobCardLarge';
 
 const RECENT_SEARCHES_KEY = 'recent_searches';
 const RECENTLY_VIEWED_KEY = 'recently_viewed_jobs';
+const BANNER_CLOSED_KEY = 'home_banner_closed_v1';
+
+export const getBannerClosed = async (): Promise<boolean> => {
+  try {
+    const value = await AsyncStorage.getItem(BANNER_CLOSED_KEY);
+    return value === 'true';
+  } catch (e) {
+    return false;
+  }
+};
+
+export const setBannerClosed = async (closed: boolean) => {
+  try {
+    if (closed) {
+      await AsyncStorage.setItem(BANNER_CLOSED_KEY, 'true');
+    } else {
+      await AsyncStorage.removeItem(BANNER_CLOSED_KEY);
+    }
+  } catch (e) {
+    // ignore
+  }
+};
 
 export const getRecentSearches = async (): Promise<string[]> => {
   try {

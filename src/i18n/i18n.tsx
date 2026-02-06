@@ -37,6 +37,7 @@ const es: Dict = {
     goodMorning: 'Buenos días',
     goodAfternoon: 'Buenas tardes',
     goodEvening: 'Buenas noches',
+    newVacancies: 'Nuevas vacantes',
   },
   detail: {
     salaryMonthly: 'Salario (Mensual)',

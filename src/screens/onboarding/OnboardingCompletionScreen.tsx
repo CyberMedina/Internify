@@ -72,7 +72,7 @@ export default function OnboardingCompletionScreen({ navigation }: Props) {
            <Animated.View style={rocketStyle}>
              <View style={[styles.iconCircle, { backgroundColor: colors.chipBg, borderColor: colors.border }]}>
                 <Image 
-                  source={require('../../assets/images/uni-logo.png')} 
+                  source={require('../../assets/images/InternifyNoLogo.png')} 
                   style={{ width: 100, height: 100 }} 
                   resizeMode="contain"
                 />

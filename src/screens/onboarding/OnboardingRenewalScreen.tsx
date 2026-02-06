@@ -27,7 +27,7 @@ export default function OnboardingRenewalScreen({ navigation }: Props) {
               end={{ x: 1, y: 1 }}
            >
               <Image 
-                source={require('../../assets/images/uni-logo.png')} 
+                source={require('../../assets/images/InternifyNoLogo.png')} 
                 style={{ width: 70, height: 70, tintColor: '#FFF' }} 
                 resizeMode="contain"
               />

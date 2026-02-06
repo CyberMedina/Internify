@@ -56,6 +56,7 @@ export interface Vacancy {
   };
   tags?: string[];
   applicants_count?: number;
+  match_percentage?: number;
   // Legacy fields support if needed, or remove if fully migrating
   company_photo?: string; 
   modality_label?: string;

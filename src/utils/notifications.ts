@@ -45,6 +45,8 @@ export async function registerForPushNotificationsAsync() {
     try {
         const projectId =
             Constants?.expoConfig?.extra?.eas?.projectId ?? Constants?.easConfig?.projectId;
+        
+        console.log('[Notifications] Using Project ID:', projectId);
             
         if (!projectId) {
             console.log("Project ID not found. Run 'eas init' to configure it for Push Notifications.");

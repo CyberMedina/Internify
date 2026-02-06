@@ -5,6 +5,7 @@ import MyApplicationsScreen from '../screens/MyApplicationsScreen';
 import MyProfileScreen from '../screens/MyProfileScreen';
 import ApplicationStatusScreen from '../screens/ApplicationStatusScreen';
 import SettingsScreen from '../screens/SettingsScreen';
+import PDFViewerScreen from '../screens/PDFViewerScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -16,6 +17,7 @@ export default function ProfileStack() {
       <Stack.Screen name="ApplicationStatus" component={ApplicationStatusScreen} />
       <Stack.Screen name="MyProfile" component={MyProfileScreen} />
       <Stack.Screen name="Settings" component={SettingsScreen} />
+      <Stack.Screen name="PDFViewer" component={PDFViewerScreen} />
     </Stack.Navigator>
   );
 }

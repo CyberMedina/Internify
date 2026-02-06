@@ -1,6 +1,6 @@
-import React, { useCallback, useEffect, useState, useMemo } from 'react';
-import { View, Text, ScrollView, TextInput, TouchableOpacity, ActivityIndicator, Platform, LayoutAnimation, UIManager } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import React, { useCallback, useEffect, useState, useMemo, useRef } from 'react';
+import { View, Text, ScrollView, TextInput, TouchableOpacity, ActivityIndicator, Platform, LayoutAnimation, UIManager, DeviceEventEmitter, useWindowDimensions } from 'react-native';
+import { useNavigation, useScrollToTop } from '@react-navigation/native';
 import { useTheme } from '../theme/ThemeContext';
 import { Feather } from '@expo/vector-icons';
 import { FlashList } from '@shopify/flash-list';
@@ -11,7 +11,9 @@ import Animated, {
   interpolate, 
   Extrapolation,
   FadeIn,
-  FadeOut
+  FadeOut,
+  useAnimatedReaction,
+  runOnJS
 } from 'react-native-reanimated';
 
 import { LinearGradient } from 'expo-linear-gradient';
@@ -30,8 +32,10 @@ import { useI18n } from '../i18n/i18n';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
 import { useSaved } from '../context/SavedContext';
+import { useVacancyContext } from '../context/VacancyContext';
 import { getSuggestedVacancies, getCategories, getVacancies } from '../services/vacancyService';
 import { Vacancy, Category } from '../types/vacancy';
+import { getBannerClosed, setBannerClosed } from '../utils/storage';
 
 const AnimatedFlashList = Animated.createAnimatedComponent(FlashList);
 const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
@@ -48,17 +52,25 @@ const mapVacancyToJob = (v: Vacancy): Job => ({
   companyLogo: v.company.logo || v.company.photo,
   postedTime: v.dates?.posted_human,
   isApplied: v.is_applied,
-  isSaved: v.is_saved
+  isSaved: v.is_saved,
+  match: v.match_percentage
 });
 
 export default function HomeScreen() {
   const { colors, spacing, typography, toggleScheme } = useTheme();
   const { t } = useI18n();
   const { studentProfile, fetchStudentProfile, userToken } = useAuth();
+  const { isFeedOutdated, markFeedAsUpdated } = useVacancyContext();
   const savedCtx = useSaved();
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const CARD_WIDTH = width * 0.85; // 75% del ancho de la pantalla para ver la siguiente
   
+  // Ref para Scroll To Top
+  const listRef = useRef<FlashList<Job> | null>(null);
+  useScrollToTop(listRef);
+
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   
@@ -75,6 +87,7 @@ export default function HomeScreen() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [autoSelected, setAutoSelected] = useState(false);
   const [initialSetupDone, setInitialSetupDone] = useState(false);
+  const [showBanner, setShowBanner] = useState(false); // Default hidden until check
 
   // Cache state
   type CacheEntry = {
@@ -97,7 +110,13 @@ export default function HomeScreen() {
   // Initial load
   useEffect(() => {
     loadInitialData();
+    checkBannerStatus();
   }, []);
+
+  const checkBannerStatus = async () => {
+    const closed = await getBannerClosed();
+    setShowBanner(!closed);
+  };
 
   const loadInitialData = async () => {
     if (!userToken) return;
@@ -286,6 +305,8 @@ export default function HomeScreen() {
   }, [categoriesList, studentProfile]);
 
   const onRefresh = useCallback(async () => {
+    // Si refrescamos manualmente, también limpiamos la notificación de "Nuevas Vacantes"
+    markFeedAsUpdated();
     setRefreshing(true);
     setPage(1);
     
@@ -304,6 +325,33 @@ export default function HomeScreen() {
       setRefreshing(false);
     }
   }, [userToken, activeCatId, searchText]);
+
+  const handlePillPress = useCallback(() => {
+    markFeedAsUpdated();
+    
+    // Scroll al inicio suavemente
+    listRef.current?.scrollToOffset({ offset: 0, animated: true });
+
+    // Si tenemos una categoría de carrera detectada y no estamos en ella, vamos allá
+    if (careerCategory && activeCatId !== careerCategory.id) {
+        // Lógica manual de cambio de categoría para asegurar refresh fresco (sin caché)
+        setActiveCatId(careerCategory.id);
+        
+        // Animaciones (valores hardcodeados 0 y 70 para evitar problemas de hoisting si las const están definidas abajo)
+        scrollY.value = 0;
+        expandY.value = 70; // AVATAR_SECTION_HEIGHT
+
+        setPage(1);
+        setRecent([]); // Limpiar para feedback visual de carga
+        setIsCategoryLoading(true);
+        
+        // Fetch directo ignorando caché
+        fetchRecent(1, searchText, careerCategory.id);
+    } else {
+        // Comportamiento normal si ya estamos en la categoría correcta o no hay carrera
+        onRefresh();
+    }
+  }, [markFeedAsUpdated, onRefresh, careerCategory, activeCatId, searchText]);
 
   const handleCategoryPress = (catId: number | null) => {
     if (activeCatId === catId) return;
@@ -409,6 +457,12 @@ export default function HomeScreen() {
     };
   });
 
+  const pillAnimatedStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ translateY: expandY.value }],
+    };
+  });
+
   const headerContainerAnimatedStyle = useAnimatedStyle(() => {
     const borderRadius = interpolate(expandY.value, [0, AVATAR_SECTION_HEIGHT], [25, 30], Extrapolation.CLAMP);
     return {
@@ -422,6 +476,29 @@ export default function HomeScreen() {
   // Chips Row: ~50px + marginTop(10) = ~60px
   // Total Expanded: Insets + 70 + 76 + 60 = Insets + 206
   const CONTENT_PADDING_TOP = insets.top + 206;
+
+  // Escuchar evento de tab press para refrescar y hacer scroll top
+  const lastRefreshTimeRef = useRef<number>(0);
+
+  useEffect(() => {
+    const subscription = DeviceEventEmitter.addListener('event.homeTabPressed', () => {
+      if (!navigation.isFocused()) return;
+
+      // Siempre hacemos scroll al inicio
+      listRef.current?.scrollToOffset({ offset: 0, animated: true });
+
+      // Solo refrescamos si hay vacantes nuevas (pill activa)
+      if (isFeedOutdated) {
+        const now = Date.now();
+        if (!refreshing && (now - lastRefreshTimeRef.current > 2000)) {
+          lastRefreshTimeRef.current = now;
+          onRefresh();
+        }
+      }
+    });
+
+    return () => subscription.remove();
+  }, [navigation, onRefresh, refreshing, isFeedOutdated]); // Dependencias actualizadas
 
 
 
@@ -444,7 +521,7 @@ export default function HomeScreen() {
   const ListHeader = useMemo(() => (
     <View style={{ paddingTop: spacing(2) }}>
       {/* Widget de Progreso del Perfil */}
-      {studentProfile && !studentProfile.has_cv && (
+      {studentProfile && !studentProfile.has_cv && showBanner && (
         <View style={{ 
           marginHorizontal: spacing(2), 
           marginBottom: spacing(2), 
@@ -457,8 +534,26 @@ export default function HomeScreen() {
           shadowOffset: { width: 0, height: 8 }, 
           shadowOpacity: 0.1, 
           shadowRadius: 16, 
-          elevation: 3 
+          elevation: 3,
+          position: 'relative'
         }}>
+          <TouchableOpacity 
+            onPress={() => {
+              setShowBanner(false);
+              setBannerClosed(true);
+            }}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            style={{
+              position: 'absolute',
+              top: spacing(1),
+              right: spacing(1),
+              zIndex: 10,
+              padding: 4,
+            }}
+          >
+            <Feather name="x" size={20} color={colors.textSecondary} />
+          </TouchableOpacity>
+
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: spacing(2) }}>
             <View style={{ flex: 1, paddingRight: spacing(1) }}>
               <Text style={{ fontSize: typography.sizes.lg, fontWeight: '800', color: colors.text, marginBottom: 4 }}>
@@ -468,7 +563,7 @@ export default function HomeScreen() {
                 Sube tu CV para <Text style={{ fontWeight: '700', color: colors.primary }}>activar tu visibilidad</Text> ante las empresas.
               </Text>
             </View>
-            <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: colors.chipBg, alignItems: 'center', justifyContent: 'center' }}>
+            <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: colors.chipBg, alignItems: 'center', justifyContent: 'center', marginTop: spacing(2) }}>
               <Feather name="briefcase" size={22} color={colors.primary} />
             </View>
           </View>
@@ -491,26 +586,37 @@ export default function HomeScreen() {
       )}
 
       {/* Suggested */}
-      {suggested.length > 0 && (
-        <View style={{ paddingHorizontal: spacing(2), marginBottom: spacing(2) }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+      {suggested.length > 0 && careerCategory && activeCatId === careerCategory.id && (
+        <View style={{ marginBottom: spacing(2) }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: spacing(2) }}>
             <Text style={{ fontSize: typography.sizes.lg, fontWeight: '700', color: colors.text }}>{t('home.suggested')}</Text>
-            <TouchableOpacity>
+            {suggested.length > 1 && (
+            <TouchableOpacity onPress={() => navigation.navigate('SuggestedJobs', { jobs: suggested })}>
               <Text style={{ color: colors.primary, fontWeight: '600' }}>{t('common.viewAll')}</Text>
             </TouchableOpacity>
+            )}
           </View>
+          {suggested.length === 1 ? (
+             <View style={{ paddingHorizontal: spacing(2), marginTop: spacing(1.5), paddingBottom: spacing(1.5) }}>
+                <JobCardLarge job={suggested[0]} showBookmark={false} style={{ width: '100%' }} />
+             </View>
+          ) : (
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
             style={{ marginTop: spacing(1.5), overflow: 'visible' }}
-            contentContainerStyle={{ paddingRight: spacing(2), paddingLeft: spacing(0.5), paddingBottom: spacing(1.5) }}
+            contentContainerStyle={{ paddingLeft: spacing(2), paddingRight: spacing(2), paddingBottom: spacing(1.5) }}
+            decelerationRate="fast"
+            snapToInterval={CARD_WIDTH + spacing(2)} // Ancho dinámico + margen
+            snapToAlignment="start" // Alineamos al inicio
           >
-            {suggested.map((job, idx) => (
-              <View key={job.id} style={{ marginLeft: idx === 0 ? 0 : 0 }}>
-                <JobCardLarge job={job} />
+            {suggested.slice(0, 4).map((job, idx) => (
+              <View key={job.id} style={{ marginRight: spacing(2) }}>
+                <JobCardLarge job={job} showBookmark={false} style={{ width: CARD_WIDTH }} />
               </View>
             ))}
           </ScrollView>
+          )}
         </View>
       )}
 
@@ -519,7 +625,7 @@ export default function HomeScreen() {
         <Text style={{ fontSize: typography.sizes.lg, fontWeight: '700', color: colors.text }}>{t('home.recent')}</Text>
       </View>
     </View>
-  ), [studentProfile, suggested, colors, spacing, typography, t, navigation]);
+  ), [studentProfile, suggested, colors, spacing, typography, t, navigation, activeCatId, careerCategory, showBanner]);
 
   if (loading) {
     return <HomeSkeleton />;
@@ -606,7 +712,10 @@ export default function HomeScreen() {
                 {t('common.searchPlaceholder')}
               </Text>
             </TouchableOpacity>
-            <TouchableOpacity style={{ marginLeft: spacing(1), backgroundColor: '#FFD166', width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' }}>
+            <TouchableOpacity 
+              onPress={() => navigation.navigate('Search', { openFilters: true })}
+              style={{ marginLeft: spacing(1), backgroundColor: '#FFD166', width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' }}
+            >
               <Feather name="sliders" size={18} color={colors.text} />
             </TouchableOpacity>
           </View>
@@ -643,6 +752,7 @@ export default function HomeScreen() {
 
       {/* Contenido Scrolleable */}
       <AnimatedFlashList
+        ref={listRef}
         key={activeCatId ? activeCatId.toString() : 'all'}
         data={recent}
         keyExtractor={keyExtractor}
@@ -691,6 +801,46 @@ export default function HomeScreen() {
           </View>
         ) : <View style={{ height: 20 }} />}
       />
+      
+      {/* Pastilla Notificación Nuevas Vacantes */}
+      {isFeedOutdated && (
+        <Animated.View 
+          entering={FadeIn.duration(400).delay(200)}
+          exiting={FadeOut.duration(300)}
+          style={[
+            {
+              position: 'absolute',
+              top: Platform.OS === 'ios' ? insets.top + 200 : 200, // Ajustado para estar debajo de los chips (Aprox Header + Chips)
+              alignSelf: 'center',
+              zIndex: 1000,
+            },
+            pillAnimatedStyle
+          ]}
+        >
+          <TouchableOpacity
+            onPress={handlePillPress}
+            activeOpacity={0.8}
+            style={{
+               backgroundColor: colors.primary,
+               paddingHorizontal: 16,
+               paddingVertical: 10,
+               borderRadius: 24,
+               flexDirection: 'row',
+               alignItems: 'center',
+               shadowColor: "#000",
+               shadowOffset: { width: 0, height: 4 },
+               shadowOpacity: 0.3,
+               shadowRadius: 4.65,
+               elevation: 8,
+            }}
+          >
+             <Feather name="arrow-up" size={16} color="#fff" style={{ marginRight: 8 }} />
+             <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 13 }}>
+               {t('home.newVacancies')}
+             </Text>
+          </TouchableOpacity>
+        </Animated.View>
+      )}
     </View>
   );
 }

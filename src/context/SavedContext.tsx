@@ -181,8 +181,10 @@ export function SavedProvider({ children }: { children: React.ReactNode }) {
 
         if (isCurrentlySaved) {
             setList((prev) => prev.filter(item => item.id !== job.id));
+            showToast('La vacante se eliminó de tus guardados', 'info', 'Guardado removido', 3000, 'bookmark');
         } else {
              setList((prev) => [job, ...prev]);
+             showToast('La vacante se ha guardado correctamente', 'success', 'Vacante guardada', 3000, 'bookmark');
         }
 
     } catch (error: any) {

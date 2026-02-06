@@ -1,7 +1,7 @@
 import { authEvents } from '../utils/authEvents';
 
 // TODO: Move this to an environment variable or config file
-const BASE_URL = 'https://overfoul-domingo-unharmable.ngrok-free.dev/api';
+export const BASE_URL = 'https://overfoul-domingo-unharmable.ngrok-free.dev/api';
 
 interface RequestOptions extends RequestInit {
   token?: string;

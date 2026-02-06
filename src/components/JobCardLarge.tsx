@@ -1,5 +1,5 @@
 import React, { memo } from 'react';
-import { View, Text, TouchableOpacity, Image } from 'react-native';
+import { View, Text, TouchableOpacity, Image, StyleProp, ViewStyle } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
 import Chip from './Chip';
 import AvatarGroup from './AvatarGroup';
@@ -24,11 +24,16 @@ export type Job = {
   postedTime?: string;
   isApplied?: boolean;
   isSaved?: boolean;
+  match?: number;
 };
 
-type Props = { job: Job };
+type Props = { 
+  job: Job;
+  showBookmark?: boolean;
+  style?: StyleProp<ViewStyle>;
+};
 
-const JobCardLarge = memo(({ job }: Props) => {
+const JobCardLarge = memo(({ job, showBookmark = true, style }: Props) => {
   const { colors, spacing, radius, typography, isDark } = useTheme();
   const navigation = useNavigation<any>();
   const savedCtx = useSaved();
@@ -44,14 +49,13 @@ const JobCardLarge = memo(({ job }: Props) => {
   return (
     <TouchableOpacity
       onPress={() => navigation.navigate('JobDetail', { job })}
-      style={{
+      style={[{
         width: 300,
         backgroundColor: colors.surface,
         borderRadius: 20,
         padding: spacing(2),
-        marginRight: spacing(2),
         shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 10, elevation: 2,
-      }}
+      }, style]} 
       activeOpacity={0.9}
     >
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -64,22 +68,62 @@ const JobCardLarge = memo(({ job }: Props) => {
             )}
           </View>
           <View style={{ marginLeft: spacing(1), flex: 1 }}>
-            <Text numberOfLines={1} style={{ fontSize: typography.sizes.lg, fontWeight: '700', color: colors.text }}>{job.title}</Text>
-            <Text numberOfLines={1} style={{ color: colors.textSecondary, marginTop: 2 }}>{job.company}</Text>
+            <Text numberOfLines={1} style={{ fontSize: typography.sizes.md, fontWeight: '700', color: colors.text }}>{job.title}</Text>
+            <Text numberOfLines={1} style={{ color: colors.textSecondary, marginTop: 2, fontSize: typography.sizes.sm }}>{job.company}</Text>
           </View>
         </View>
-        <BookmarkButton 
-          isSaved={isSaved} 
-          isLoading={isLoading}
-          onToggle={savedCtx ? () => savedCtx.toggle(job) : () => {}} 
-          size={20} 
-          style={{ padding: 6 }}
-        />
+        
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          {job.match !== undefined && (
+            <View style={{
+              backgroundColor: job.match >= 70 ? (isDark ? 'rgba(16, 185, 129, 0.2)' : '#D1FAE5') : 
+                              job.match >= 40 ? (isDark ? 'rgba(245, 158, 11, 0.2)' : '#FEF3C7') : 
+                              (isDark ? 'rgba(239, 68, 68, 0.2)' : '#FEE2E2'),
+              paddingHorizontal: 8,
+              paddingVertical: 4,
+              borderRadius: 12,
+              flexDirection: 'row',
+              alignItems: 'center',
+              borderWidth: 1,
+              borderColor: job.match >= 70 ? (isDark ? '#34D399' : '#10B981') : 
+                          job.match >= 40 ? (isDark ? '#FBBF24' : '#F59E0B') : 
+                          (isDark ? '#F87171' : '#EF4444')
+            }}>
+              <Feather 
+                name="bar-chart-2" 
+                size={12} 
+                color={job.match >= 70 ? (isDark ? '#34D399' : '#059669') : 
+                      job.match >= 40 ? (isDark ? '#FBBF24' : '#D97706') : 
+                      (isDark ? '#F87171' : '#DC2626')} 
+              />
+              <Text style={{
+                marginLeft: 4,
+                fontSize: 12,
+                fontWeight: '800',
+                color: job.match >= 70 ? (isDark ? '#34D399' : '#059669') : 
+                      job.match >= 40 ? (isDark ? '#FBBF24' : '#D97706') : 
+                      (isDark ? '#F87171' : '#DC2626')
+              }}>
+                {job.match}%
+              </Text>
+            </View>
+          )}
+
+          {showBookmark && (
+            <BookmarkButton 
+              isSaved={isSaved} 
+              isLoading={isLoading}
+              onToggle={savedCtx ? () => savedCtx.toggle(job) : () => {}} 
+              size={20} 
+              style={{ padding: 6 }}
+            />
+          )}
+        </View>
       </View>
 
       <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: spacing(1) }}>
-        <Feather name="map-pin" size={14} color={colors.textSecondary} />
-        <Text style={{ color: colors.textSecondary, marginLeft: 4, fontSize: typography.sizes.sm }}>{job.location}</Text>
+        <Feather name="map-pin" size={12} color={colors.textSecondary} />
+        <Text style={{ color: colors.textSecondary, marginLeft: 4, fontSize: typography.sizes.xs }}>{job.location}</Text>
         
         {isApplied && (
             <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 10, backgroundColor: isDark ? 'rgba(16, 185, 129, 0.2)' : '#D1FAE5', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 }}>

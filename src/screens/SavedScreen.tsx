@@ -32,6 +32,7 @@ export default function SavedScreen() {
     }
   }, [loadMore, hasMore, loadingMore, isLoading]);
 
+
   return (
     <ScreenContainer safeTop>
       {/* Header */}
@@ -44,47 +45,51 @@ export default function SavedScreen() {
         <Text style={{ color: colors.text, fontWeight: '700', fontSize: typography.sizes.lg }}>Guardados</Text>
       </View>
 
-      <FlatList
-        data={saved}
-        keyExtractor={(it) => it.id}
-        contentContainerStyle={{ paddingHorizontal: spacing(2), paddingBottom: insets.bottom + spacing(2), flexGrow: 1 }}
-        ItemSeparatorComponent={() => <View style={{ height: spacing(1) }} />}
-        renderItem={({ item }) => (
-          <JobCardSmall job={item} applicantsLabel="Solicitantes" />
-        )}
-        onEndReached={handleEndReached}
-        onEndReachedThreshold={0.5}
-        ListFooterComponent={
-          loadingMore ? (
-            <View style={{ padding: spacing(2), alignItems: 'center' }}>
-              <ActivityIndicator color={colors.primary} />
+      {isLoading && saved.length === 0 ? (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      ) : (
+        <FlatList
+          data={saved}
+          keyExtractor={(it) => it.id}
+          contentContainerStyle={{ paddingHorizontal: spacing(2), paddingBottom: insets.bottom + spacing(2), flexGrow: 1 }}
+          ItemSeparatorComponent={() => <View style={{ height: spacing(1.5) }} />}
+          renderItem={({ item }) => (
+            <JobCardSmall job={item} applicantsLabel="Solicitantes" />
+          )}
+          onEndReached={handleEndReached}
+          onEndReachedThreshold={0.5}
+          ListFooterComponent={
+            loadingMore ? (
+              <View style={{ padding: spacing(2), alignItems: 'center' }}>
+                <ActivityIndicator color={colors.primary} />
+              </View>
+            ) : null
+          }
+          refreshControl={
+              <RefreshControl
+                  refreshing={isLoading}
+                  onRefresh={handleRefresh}
+                  colors={[colors.primary]} // Android
+                  tintColor={colors.primary} // iOS
+              />
+          }
+          ListEmptyComponent={
+            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing(4), paddingTop: spacing(8) }}>
+              <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', marginBottom: spacing(2) }}>
+                <Feather name="bookmark" size={40} color={colors.textSecondary} />
+              </View>
+              <Text style={{ color: colors.text, fontSize: typography.sizes.lg, fontWeight: '700', marginBottom: spacing(1), textAlign: 'center' }}>
+                No tienes vacantes guardadas
+              </Text>
+              <Text style={{ color: colors.textSecondary, fontSize: typography.sizes.md, textAlign: 'center' }}>
+                Las vacantes que guardes aparecerán aquí para que puedas acceder a ellas fácilmente.
+              </Text>
             </View>
-          ) : null
-        }
-        refreshControl={
-            <RefreshControl
-                refreshing={isLoading}
-                onRefresh={handleRefresh}
-                colors={[colors.primary]} // Android
-                tintColor={colors.primary} // iOS
-            />
-        }
-        ListEmptyComponent={
-          !isLoading ? (
-          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing(4), paddingTop: spacing(8) }}>
-            <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', marginBottom: spacing(2) }}>
-              <Feather name="bookmark" size={40} color={colors.textSecondary} />
-            </View>
-            <Text style={{ color: colors.text, fontSize: typography.sizes.lg, fontWeight: '700', marginBottom: spacing(1), textAlign: 'center' }}>
-              No tienes vacantes guardadas
-            </Text>
-            <Text style={{ color: colors.textSecondary, fontSize: typography.sizes.md, textAlign: 'center' }}>
-              Las vacantes que guardes aparecerán aquí para que puedas acceder a ellas fácilmente.
-            </Text>
-          </View>
-          ) : null
-        }
-      />
+          }
+        />
+      )}
     </ScreenContainer>
   );
 }

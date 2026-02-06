@@ -31,14 +31,23 @@ export default function JobDetailScreen() {
   const { colors, spacing, radius, typography, isDark } = useTheme();
   const navigation = useNavigation();
   const route = useRoute() as any;
-  const job: Job = route.params?.job;
+  
+  // Deep linking support
+  const passedJob = route.params?.job as Job | undefined;
+  const idFromParams = route.params?.id;
+  
+  // Definimos jobId ya sea del objeto job o del parametro directo
+  const jobId = passedJob?.id || idFromParams;
+  // Mantenemos referencia a job para UI fallbacks
+  const job = passedJob;
+
   const insets = useSafeAreaInsets();
   const { t } = useI18n();
   const { userToken, studentProfile } = useAuth();
   const savedCtx = useSaved();
   const applicationsCtx = useApplications();
-  const isSaved = savedCtx?.isSaved(job?.id || '') ?? false;
-  const isSaveProcessing = savedCtx?.isProcessing(job?.id || '') ?? false;
+  const isSaved = savedCtx?.isSaved(jobId || '') ?? false;
+  const isSaveProcessing = savedCtx?.isProcessing(jobId || '') ?? false;
   const [tab, setTab] = React.useState<'about' | 'company'>('about');
 
   const [submitting, setSubmitting] = React.useState(false);
@@ -59,10 +68,10 @@ export default function JobDetailScreen() {
 
   React.useEffect(() => {
     const fetchDetail = async () => {
-      if (!job?.id || !userToken) return;
+      if (!jobId || !userToken) return;
       try {
         setLoading(true);
-        const id = parseInt(job.id, 10);
+        const id = parseInt(jobId.toString(), 10);
         if (!isNaN(id)) {
           const res = await getVacancyDetail(userToken, id);
           setVacancy(res.data);
@@ -75,7 +84,7 @@ export default function JobDetailScreen() {
       }
     };
     fetchDetail();
-  }, [job?.id, userToken]);
+  }, [jobId, userToken]);
 
   const companyLogo = vacancy?.company?.logo ?? vacancy?.company?.photo ?? job?.companyLogo;
 
@@ -119,7 +128,7 @@ export default function JobDetailScreen() {
     salary: vacancy?.salary_range ? `C$${vacancy.salary_range}` : (job?.salary ?? ''),
     modality: vacancy?.modality?.label ?? job?.tags?.[1] ?? 'N/A',
     category: vacancy?.category?.name ?? vacancy?.categories?.[0] ?? job?.tags?.[0] ?? 'General',
-    level: vacancy?.areas?.[0] ?? job?.tags?.[2] ?? 'Pasantía',
+    match: vacancy?.match_percentage,
     description: vacancy?.description,
     requirements: vacancy?.requirements ?? [],
     applicants: vacancy?.applicants_count ?? job?.applicants ?? 0,
@@ -157,13 +166,19 @@ export default function JobDetailScreen() {
     isSharing.current = true;
     setSharing(true);
     
-    const message = `¡Mira esta vacante de ${data.title} en ${data.company}! \n\nUbicación: ${data.location}\nSalario: ${data.salary}\n\nDescarga la app para aplicar.`;
+    // Obtener ID real
+    const vacancyId = vacancy?.id || job?.id;
+    // URL para deep linking
+    const shareUrl = vacancyId ? `https://overfoul-domingo-unharmable.ngrok-free.dev/vacancies/${vacancyId}` : '';
+    
+    // Mensaje mejorado con link
+    const message = `¡Mira esta vacante de ${data.title} en ${data.company}! \n\nUbicación: ${data.location}\nSalario: ${data.salary}\n\nAplica aquí: ${shareUrl}`;
 
     try {
-      const vacancyId = vacancy?.id || job?.id;
-
       if (vacancyId) {
         // Endpoint para obtener la imagen generada
+        // Usamos la API URL base definida en services/api.ts pero la reconstruimos aquí o usamos una variable de entorno
+        // Por ahora mantenemos la URL existente pero es ideal centralizarla
         const imageUrl = `https://overfoul-domingo-unharmable.ngrok-free.dev/api/vacancies/${vacancyId}/og-image`;
         // Usar cacheDirectory con timestamp para evitar colisiones y problemas de caché
         const filename = `vacancy-${vacancyId}-${Date.now()}.png`;
@@ -258,7 +273,16 @@ export default function JobDetailScreen() {
       {/* Top actions (safe area) */}
       <View style={{ paddingHorizontal: spacing(2), paddingTop: insets.top + spacing(1), paddingBottom: spacing(1), flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
         <TouchableOpacity
-          onPress={() => navigation.goBack()}
+          onPress={() => {
+            if (navigation.canGoBack()) {
+              navigation.goBack();
+            } else {
+              navigation.reset({
+                index: 0,
+                routes: [{ name: 'MainTabs' }],
+              });
+            }
+          }}
           style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' }}
         >
           <Feather name="arrow-left" size={18} color={colors.text} />
@@ -381,18 +405,40 @@ export default function JobDetailScreen() {
               </View>
             </View>
 
-            {/* Nivel */}
-            <View style={{ width: '48%', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing(1.5), marginBottom: spacing(1.5), shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 1 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: colors.chipBg, alignItems: 'center', justifyContent: 'center' }}>
-                  <Feather name="trending-up" size={14} color={dominantColor} />
+            {/* Match Percentage */}
+            {data.match !== undefined && (
+              <View style={{ width: '48%', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing(1.5), marginBottom: spacing(1.5), shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 1 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: colors.chipBg, alignItems: 'center', justifyContent: 'center' }}>
+                      <Feather name="bar-chart-2" size={14} color={dominantColor} />
+                    </View>
+                    <Text style={{ marginLeft: spacing(1), color: colors.textSecondary, fontSize: typography.sizes.xs }}>Coincidencia</Text>
+                  </View>
                 </View>
-                <Text style={{ marginLeft: spacing(1), color: colors.textSecondary, fontSize: typography.sizes.xs }}>{t('detail.level')}</Text>
+                
+                <View style={{ marginTop: 10 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <Text style={{ 
+                      fontSize: 22, 
+                      fontWeight: '800', 
+                      color: data.match >= 70 ? '#10B981' : data.match >= 40 ? '#F59E0B' : '#EF4444' 
+                    }}>
+                      {data.match}%
+                    </Text>
+                    <Text style={{ fontSize: 10, color: colors.textSecondary, marginBottom: 4 }}>con tu perfil</Text>
+                  </View>
+                  <View style={{ height: 6, backgroundColor: colors.border, borderRadius: 3, overflow: 'hidden' }}>
+                    <View style={{ 
+                      height: '100%', 
+                      width: `${data.match}%`, 
+                      backgroundColor: data.match >= 70 ? '#10B981' : data.match >= 40 ? '#F59E0B' : '#EF4444',
+                      borderRadius: 3
+                    }} />
+                  </View>
+                </View>
               </View>
-              <View style={{ marginTop: 6 }}>
-                <Chip label={data.level} size="xs" />
-              </View>
-            </View>
+            )}
           </View>
         </View>
 

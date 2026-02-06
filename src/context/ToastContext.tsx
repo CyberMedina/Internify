@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useCallback } from 'react';
 import Toast, { ToastType } from '../components/Toast';
 
 interface ToastContextType {
-  showToast: (message: string, type?: ToastType, title?: string, duration?: number) => void;
+  showToast: (message: string, type?: ToastType, title?: string, duration?: number, icon?: string) => void;
   hideToast: () => void;
 }
 
@@ -14,12 +14,14 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [title, setTitle] = useState<string | undefined>(undefined);
   const [type, setType] = useState<ToastType>('info');
   const [duration, setDuration] = useState(4000);
+  const [icon, setIcon] = useState<string | undefined>(undefined);
 
-  const showToast = useCallback((msg: string, toastType: ToastType = 'info', customTitle?: string, dur: number = 4000) => {
+  const showToast = useCallback((msg: string, toastType: ToastType = 'info', customTitle?: string, dur: number = 4000, customIcon?: string) => {
     setMessage(msg);
     setType(toastType);
     setTitle(customTitle);
     setDuration(dur);
+    setIcon(customIcon);
     setVisible(true);
   }, []);
 
@@ -36,6 +38,7 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         title={title}
         type={type}
         duration={duration}
+        icon={icon}
         onDismiss={hideToast}
       />
     </ToastContext.Provider>

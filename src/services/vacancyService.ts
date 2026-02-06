@@ -23,6 +23,9 @@ export const getVacancies = async (
     internshipTypeId?: number;
     modality?: string;
     location?: string;
+    minSalary?: number;
+    maxSalary?: number;
+    datePosted?: string;
   } = {}
 ): Promise<PaginatedResponse<Vacancy>> => {
   const params = new URLSearchParams({
@@ -35,6 +38,9 @@ export const getVacancies = async (
   if (filters.internshipTypeId) params.append('internship_type_id', filters.internshipTypeId.toString());
   if (filters.modality) params.append('modality', filters.modality);
   if (filters.location) params.append('location', filters.location);
+  if (filters.minSalary) params.append('min_salary', filters.minSalary.toString());
+  if (filters.maxSalary) params.append('max_salary', filters.maxSalary.toString());
+  if (filters.datePosted) params.append('date_posted', filters.datePosted);
 
   return api.get<PaginatedResponse<Vacancy>>(`/vacancies?${params.toString()}`, { token });
 };

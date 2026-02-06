@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { FontAwesome5 } from '@expo/vector-icons';
+import { getInitials } from '../../utils/stringUtils';
 import Animated, { 
   useSharedValue, 
   useAnimatedStyle, 
@@ -56,16 +57,40 @@ export default function OnboardingWelcomeScreen({ navigation }: Props) {
     buttonScale.value = withSpring(1);
   };
 
+  const userPhoto = userData?.user_detail?.pf_photo;
+
   return (
     <ScreenContainer safeTop safeBottom style={styles.container}>
       <View style={styles.content}>
         <View style={styles.illustrationContainer}>
            <Animated.View style={rocketStyle}>
-             <Image 
-               source={require('../../assets/images/uni-logo.png')} 
-               style={{ width: 180, height: 180 }} 
-               resizeMode="contain"
-             />
+             {userPhoto ? (
+               <Image 
+                 source={{ uri: userPhoto }} 
+                 style={{ width: 150, height: 150, borderRadius: 75, borderWidth: 4, borderColor: colors.card }} 
+                 resizeMode="cover"
+               />
+             ) : (
+                <View style={{ 
+                  width: 150, height: 150, borderRadius: 75, 
+                  backgroundColor: colors.primary, 
+                  justifyContent: 'center', alignItems: 'center',
+                  borderWidth: 4, borderColor: colors.card,
+                  shadowColor: colors.primary,
+                  shadowOffset: { width: 0, height: 8 },
+                  shadowOpacity: 0.3,
+                  shadowRadius: 16,
+                  elevation: 8
+                }}>
+                  <Text style={{ 
+                    color: '#FFF', 
+                    fontSize: 48, 
+                    fontFamily: typography.bold 
+                  }}>
+                    {getInitials(userData?.name || 'Estudiante')}
+                  </Text>
+                </View>
+             )}
            </Animated.View>
            {/* Decorative circles behind */}
            <View style={[styles.circle, { backgroundColor: colors.primary, opacity: 0.05, width: 280, height: 280 }]} />

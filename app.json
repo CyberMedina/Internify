@@ -1,12 +1,17 @@
 {
   "expo": {
-    "name": "app-pasantias",
+    "name": "Internify",
     "slug": "app-pasantias",
     "scheme": "app-pasantias",
     "version": "1.0.0",
     "userInterfaceStyle": "automatic",
     "orientation": "portrait",
+    "icon": "./src/assets/images/Internifyv2.png",
+    "ios": {
+      "associatedDomains": ["applinks:overfoul-domingo-unharmable.ngrok-free.dev"]
+    },
     "splash": {
+      "image": "./src/assets/images/Internifyv2.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
@@ -19,15 +24,39 @@
       [
         "expo-notifications",
         {
-          "icon": "./src/assets/images/uni-logo.png",
+          "icon": "./src/assets/images/InternificonMinimal.png",
           "color": "#ffffff"
         }
       ]
     ],
     "android": {
-    "package": "com.uni.internify",
-    "googleServicesFile": "./google-services.json"
-  },
+      "adaptiveIcon": {
+        "foregroundImage": "./src/assets/images/Internifyv2.png",
+        "backgroundColor": "#ffffff"
+      },
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "overfoul-domingo-unharmable.ngrok-free.dev",
+              "pathPrefix": "/vacancies"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ],
+      "package": "com.uni.internify",
+      "googleServicesFile": "./google-services.json"
+    },
+    "web": {
+      "favicon": "./src/assets/images/Internifyv2.png"
+    },
     "extra": {
       "eas": {
         "projectId": "57f34094-4431-4bf8-a130-e6f3cf7666c6"

@@ -6,7 +6,7 @@ import { notificationService } from '../services/notificationService';
 import { Notification, NotificationContent } from '../types/notification';
 
 export const useNotifications = () => {
-  const { userToken } = useAuth();
+  const { userToken, fetchStudentProfile } = useAuth();
   const navigation = useNavigation<any>();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(false);
@@ -65,37 +65,41 @@ export const useNotifications = () => {
       setNotifications(prev => 
         prev.map(n => n.id === id ? { ...n, read_at: new Date().toISOString() } : n)
       );
+      fetchStudentProfile(); 
     } catch (error) {
       console.error('Error marking notification as read:', error);
     }
-  }, [userToken]);
+  }, [userToken, fetchStudentProfile]);
 
   const markAllAsRead = useCallback(async () => {
     if (!userToken) return;
     try {
       await notificationService.markAllAsRead(userToken);
       setNotifications(prev => prev.map(n => ({ ...n, read_at: new Date().toISOString() })));
+      fetchStudentProfile();
     } catch (error) {
       console.error('Error marking all notifications as read:', error);
     }
-  }, [userToken]);
+  }, [userToken, fetchStudentProfile]);
 
   const deleteNotification = useCallback(async (id: string) => {
     if (!userToken) return;
     try {
       await notificationService.deleteNotification(userToken, id);
       setNotifications(prev => prev.filter(n => n.id !== id));
+      fetchStudentProfile();
     } catch (error) {
       console.error('Error deleting notification:', error);
       Alert.alert('Error', 'No se pudo eliminar la notificación');
     }
-  }, [userToken]);
+  }, [userToken, fetchStudentProfile]);
 
   const deleteAllNotifications = useCallback(async () => {
     if (!userToken) return;
     try {
       await notificationService.deleteAllNotifications(userToken);
       setNotifications([]);
+      fetchStudentProfile();
     } catch (error) {
       console.error('Error deleting all notifications:', error);
       Alert.alert('Error', 'No se pudieron eliminar las notificaciones');

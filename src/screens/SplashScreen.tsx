@@ -1,8 +1,7 @@
 import React from 'react';
-import { View, Text, Animated } from 'react-native';
+import { View, Text, Animated, Image } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Feather } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useI18n } from '../i18n/i18n';
 import { StatusBar } from 'expo-status-bar';
@@ -78,7 +77,11 @@ export default function SplashScreen() {
       <StatusBar style="light" />
       <Animated.View style={{ width: 88, height: 88, borderRadius: 44, backgroundColor: '#ffffff22', alignItems: 'center', justifyContent: 'center', transform: [{ scale }], opacity }}>
         <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: '#ffffff33', alignItems: 'center', justifyContent: 'center' }}>
-          <Feather name="briefcase" size={28} color="#fff" />
+          <Image 
+            source={require('../assets/images/InternificonMinimal.png')}
+            style={{ width: 40, height: 40 }}
+            resizeMode="contain"
+          />
         </View>
       </Animated.View>
       <Animated.Text

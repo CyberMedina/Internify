@@ -150,17 +150,20 @@ export default function LoginScreen({ navigation }: Props) {
           if (consentGranted) {
             const pushToken = await registerForPushNotificationsAsync();
             if (pushToken) {
-              console.log('[LoginScreen] Registering device...');
-              await api.post('/devices', {
+              console.log('[LoginScreen] Registering device with token:', pushToken);
+              const deviceResponse = await api.post('/devices', {
                 expo_push_token: pushToken,
                 expo_token: pushToken, // Enviamos ambos para asegurar compatibilidad con el backend
                 device_name: Device.modelName || Device.osName // Enviamos el nombre del dispositivo
               }, { token: data.token });
-              console.log('[LoginScreen] Dispositivo registrado exitosamente en /api/devices');
+              console.log('[LoginScreen] Dispositivo registrado exitosamente en /api/devices. Respuesta:', deviceResponse);
             }
           }
         } catch (error) {
           console.error('[LoginScreen] Error registrando dispositivo:', error);
+          if (error instanceof Error) {
+             console.error('[LoginScreen] Error message:', error.message);
+          }
           // No bloqueamos el flujo si falla el registro del token
         }
         // -------------------------------------------
@@ -256,9 +259,11 @@ export default function LoginScreen({ navigation }: Props) {
       <View style={styles.content}>
         <View style={styles.header}>
           {/* Logo Placeholder */}
-          <View style={[styles.logoContainer, { backgroundColor: colors.primary }]}>
-            <FontAwesome5 name="graduation-cap" size={40} color="#FFF" />
-          </View>
+          <Image
+            source={require('../assets/images/InternifyV3.png')}
+            style={{ width: 80, height: 80, marginBottom: 24, borderRadius: 24 }}
+            resizeMode="contain"
+          />
           
           <Text style={[styles.appName, { color: colors.text, fontSize: typography.sizes.xxl, fontFamily: typography.bold }]}>
             Internify
@@ -295,7 +300,7 @@ export default function LoginScreen({ navigation }: Props) {
       
       <View style={styles.footer}>
         <Text style={[styles.footerText, { color: colors.textSecondary, fontSize: typography.sizes.xs }]}>
-          © 2025 Universidad Nacional de Ingeniería
+          Universidad Nacional de Ingeniería
         </Text>
       </View>
 

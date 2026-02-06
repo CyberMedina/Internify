@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, Image } from 'react-native';
+import { View, Text, TouchableOpacity, Image, Linking } from 'react-native';
+import { BASE_URL, api } from '../services/api';
 import { useTheme } from '../theme/ThemeContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -9,6 +10,7 @@ import { useI18n } from '../i18n/i18n';
 import { useAuth } from '../context/AuthContext';
 import { internshipLevels } from '../mock/user';
 import LevelAvatar from '../components/LevelAvatar';
+import { useToast } from '../context/ToastContext';
 
 const Row: React.FC<{ label: string; icon: keyof typeof Feather.glyphMap; onPress?: () => void }> = ({ label, icon, onPress }) => {
   const { colors, spacing, typography } = useTheme();
@@ -53,7 +55,8 @@ export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const { t } = useI18n();
-  const { logout, studentProfile } = useAuth();
+  const { logout, studentProfile, userToken } = useAuth();
+  const { showToast } = useToast();
 
   const canNavigateBackRef = React.useRef<boolean | null>(null);
 
@@ -88,6 +91,37 @@ export default function ProfileScreen() {
   const displayName = studentProfile?.profile 
     ? `${studentProfile.profile.first_name} ${studentProfile.profile.last_name}`
     : 'Estudiante';
+
+  const openNormativas = async () => {
+    try {
+      const response = await api.get<{ key: string, url: string, name: string }>('resources/normativa_pdf', { token: userToken });
+      if (response && response.url) {
+        (navigation as any).navigate('PDFViewer', { url: response.url, title: response.name || 'Normativa' });
+      } else {
+        showToast('No se pudo obtener el documento', 'error');
+      }
+    } catch (error) {
+      console.error(error);
+      showToast('Error al cargar la normativa', 'error');
+    }
+  };
+
+  const openHelpCenter = async () => {
+    try {
+      // Remove /api from the end to get the web root
+      const webUrl = BASE_URL.replace(/\/api\/?$/, '');
+      const url = `${webUrl}/#faq`;
+      const supported = await Linking.canOpenURL(url);
+      
+      if (supported) {
+        await Linking.openURL(url);
+      } else {
+        await Linking.openURL(url);
+      }
+    } catch (error) {
+      showToast('No se pudo abrir el enlace', 'error');
+    }
+  };
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.card }}>
@@ -167,13 +201,13 @@ export default function ProfileScreen() {
 
         {/* Menu list (single continuous block) */}
         <View style={{ marginTop: spacing(2), backgroundColor: colors.surface }}>
+                    <Row label="Normativas" icon="file-text" onPress={openNormativas} />
           <Row 
             label={t('profile.settings')} 
             icon="settings" 
             onPress={() => (navigation as any).navigate('Settings')}
           />
-          <Row label={t('profile.privacyPolicy')} icon="shield" />
-          <Row label={t('profile.helpCenter')} icon="help-circle" />
+          <Row label={t('profile.helpCenter')} icon="help-circle" onPress={openHelpCenter} />
         </View>
           
         <View style={{ marginTop: spacing(2), backgroundColor: colors.surface }}>

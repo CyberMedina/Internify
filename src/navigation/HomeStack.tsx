@@ -9,7 +9,10 @@ import ApplicationStatusScreen from '../screens/ApplicationStatusScreen';
 import SearchScreen from '../screens/SearchScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
 import SettingsScreen from '../screens/SettingsScreen';
+import SuggestedJobsScreen from '../screens/SuggestedJobsScreen';
+import PDFViewerScreen from '../screens/PDFViewerScreen';
 import { Application } from '../types/vacancy';
+import { Job } from '../components/JobCardLarge';
 
 export type HomeStackParamList = {
   HomeMain: undefined;
@@ -21,6 +24,8 @@ export type HomeStackParamList = {
   Search: undefined;
   Notifications: undefined;
   Settings: undefined;
+  SuggestedJobs: { jobs: Job[] };
+  PDFViewer: { url: string; title: string };
 };
 
 const Stack = createNativeStackNavigator<HomeStackParamList>();
@@ -37,6 +42,8 @@ export default function HomeStack() {
       <Stack.Screen name="Search" component={SearchScreen} />
       <Stack.Screen name="Notifications" component={NotificationsScreen} />
       <Stack.Screen name="Settings" component={SettingsScreen} />
+      <Stack.Screen name="SuggestedJobs" component={SuggestedJobsScreen} />
+      <Stack.Screen name="PDFViewer" component={PDFViewerScreen} />
     </Stack.Navigator>
   );
 }

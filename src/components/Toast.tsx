@@ -14,9 +14,10 @@ interface ToastProps {
   type?: ToastType;
   onDismiss?: () => void;
   duration?: number;
+  icon?: string;
 }
 
-export default function Toast({ visible, message, title, type = 'info', onDismiss, duration = 4000 }: ToastProps) {
+export default function Toast({ visible, message, title, type = 'info', onDismiss, duration = 4000, icon }: ToastProps) {
   const { colors, spacing, radius, typography, isDark } = useTheme();
   const insets = useSafeAreaInsets();
 
@@ -73,7 +74,7 @@ export default function Toast({ visible, message, title, type = 'info', onDismis
           {/* Avatar / Icon Container */}
           <View style={[styles.avatarContainer, { backgroundColor: isDark ? '#2C2C2E' : '#F2F2F7' }]}>
              <View style={[styles.statusIndicator, { backgroundColor: config.primary }]} />
-             <Feather name={config.icon as any} size={20} color={isDark ? '#FFF' : '#000'} style={{ opacity: 0.7 }} />
+             <Feather name={(icon || config.icon) as any} size={20} color={isDark ? '#FFF' : '#000'} style={{ opacity: 0.7 }} />
           </View>
 
           {/* Content */}
