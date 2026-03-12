@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { TouchableOpacity, StyleProp, ViewStyle, ActivityIndicator } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring, withSequence } from 'react-native-reanimated';
-import { Feather } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../theme/ThemeContext';
 
 interface BookmarkButtonProps {
@@ -45,11 +45,10 @@ export default function BookmarkButton({
         {isLoading ? (
              <ActivityIndicator size={size} color={colors.primary} />
         ) : (
-            <Feather 
-            name={isSaved ? "bookmark" : "bookmark"} 
+            <Ionicons 
+            name={isSaved ? "bookmark" : "bookmark-outline"} 
             size={size} 
             color={iconColor} 
-            style={isSaved ? { opacity: 1 } : { opacity: 0.7 }}
             />
         )}
     </TouchableOpacity>

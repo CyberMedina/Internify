@@ -1,5 +1,8 @@
-import React, { createContext, useContext, useState, useMemo } from 'react';
+import React, { createContext, useContext, useState, useMemo, useEffect } from 'react';
 import { ColorSchemeName, useColorScheme } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const THEME_STORAGE_KEY = 'app_color_scheme';
 
 export type ColorTokens = {
   primary: string;
@@ -27,8 +30,8 @@ export const lightColors: ColorTokens = {
   chipBg: '#EEF2FF',
   success: '#10B981',
   error: '#EF4444',
-  skeletonBase: '#E5E7EB',       // gray-200 (contrasta con card/surface)
-  skeletonHighlight: '#F3F4F6',  // gray-100
+  skeletonBase: '#DFE2E8',       // gris suave, visible contra blanco
+  skeletonHighlight: '#ECEEF3',  // highlight claro para pulso visible
 };
 
 export const darkColors: ColorTokens = {
@@ -82,6 +85,25 @@ export const ThemeProvider: React.FC<{ scheme?: ColorSchemeName; children: React
   const [override, setOverride] = useState<'light' | 'dark' | 'system'>(
     (scheme as 'light' | 'dark' | 'system') || 'system'
   );
+  const [loaded, setLoaded] = useState(false);
+
+  // Cargar preferencia guardada (solo si existe)
+  useEffect(() => {
+    AsyncStorage.getItem(THEME_STORAGE_KEY).then((saved) => {
+      if (saved === 'light' || saved === 'dark' || saved === 'system') {
+        setOverride(saved);
+      }
+      // Si no hay valor guardado, se mantiene 'system' (sigue al SO)
+      setLoaded(true);
+    }).catch(() => setLoaded(true));
+  }, []);
+
+  // Persistir cuando cambia
+  const setAndSaveScheme = (s: 'light' | 'dark' | 'system') => {
+    setOverride(s);
+    AsyncStorage.setItem(THEME_STORAGE_KEY, s).catch(() => {});
+  };
+
   const effectiveScheme: 'light' | 'dark' = (override === 'system' ? (sys || 'light') : override) as 'light' | 'dark';
   const dark = effectiveScheme === 'dark';
 
@@ -92,8 +114,9 @@ export const ThemeProvider: React.FC<{ scheme?: ColorSchemeName; children: React
     spacing: (n) => n * 8,
     isDark: dark,
     scheme: override,
-    setScheme: setOverride,
-    toggleScheme: () => setOverride((prev) => (prev === 'dark' ? 'light' : 'dark')),
+    setScheme: setAndSaveScheme,
+    // Toggle basado en el tema efectivo actual (no el override)
+    toggleScheme: () => setAndSaveScheme(dark ? 'light' : 'dark'),
   }), [dark, override]);
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;

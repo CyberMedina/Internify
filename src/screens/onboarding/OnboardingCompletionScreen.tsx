@@ -70,11 +70,11 @@ export default function OnboardingCompletionScreen({ navigation }: Props) {
 
         <View style={styles.illustrationContainer}>
            <Animated.View style={rocketStyle}>
-             <View style={[styles.iconCircle, { backgroundColor: colors.chipBg, borderColor: colors.border }]}>
+             <View style={styles.iconCircle}>
                 <Image 
-                  source={require('../../assets/images/InternifyNoLogo.png')} 
-                  style={{ width: 100, height: 100 }} 
-                  resizeMode="contain"
+                  source={require('../../assets/images/InternifyV3.png')} 
+                  style={{ width: 180, height: 180, borderRadius: 90 }} 
+                  resizeMode="cover"
                 />
              </View>
            </Animated.View>
@@ -142,8 +142,12 @@ const styles = StyleSheet.create({
     borderRadius: 90,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(139, 92, 246, 0.3)',
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    elevation: 10,
   },
   star: {
     position: 'absolute',

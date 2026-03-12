@@ -16,6 +16,7 @@ import { ErrorBoundary } from 'src/components/ErrorBoundary';
 import { ToastProvider } from 'src/context/ToastContext';
 import { navigationRef } from 'src/navigation/navigationRef';
 import * as Linking from 'expo-linking';
+import { ENV } from './src/config/env';
 
 // Configuración de notificaciones en primer plano: Silenciar alerta visual (banner) y sonido
 Notifications.setNotificationHandler({
@@ -26,15 +27,26 @@ Notifications.setNotificationHandler({
   }),
 });
 
+// Parsea una URL de deep link y extrae la pantalla destino y sus parámetros
+function parseDeepLinkUrl(url: string): { screen: string; params: any } | null {
+  try {
+    const match = url.match(/\/vacancies\/(\d+)/);
+    if (match) {
+      return { screen: 'JobDetail', params: { job: { id: Number(match[1]) } } };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 const linking = {
   prefixes: [
-    'https://overfoul-domingo-unharmable.ngrok-free.dev',
+    ENV.BASE_URL,
     Linking.createURL('/'),
   ],
   config: {
     screens: {
-      // Mapea la ruta vacancies/:id a la pantalla JobDetail
-      JobDetail: 'vacancies/:id',
       MainTabs: {
         screens: {
           HomeStack: {
@@ -62,33 +74,76 @@ function Root() {
   const responseListener = useRef<Notifications.Subscription>();
   const [initialUrlChecked, setInitialUrlChecked] = useState(false);
 
-  // Guardar deep link pendiente si no hay sesión
+  // 1. Al montar, guardar deep link pendiente (SIEMPRE, sin importar auth)
   useEffect(() => {
     const checkInitialUrl = async () => {
       const url = await Linking.getInitialURL();
-      if (url && !userToken) {
+      if (url && parseDeepLinkUrl(url)) {
         await setPendingDeeplink(url);
       }
       setInitialUrlChecked(true);
     };
     checkInitialUrl();
-  }, [userToken]);
+  }, []);
 
-  // Restaurar deep link tras login
+  // 2. Procesar deep link pendiente una vez el usuario está autenticado
   useEffect(() => {
-    if (userToken && initialUrlChecked) {
-      getPendingDeeplink().then(async (url) => {
-        if (url) {
-          // Limpiar para no repetir
-          await setPendingDeeplink(null);
-          // Navegar usando el sistema de linking
-          setTimeout(() => {
-            Linking.openURL(url);
-          }, 500);
+    if (!userToken || !initialUrlChecked) return;
+
+    const processPending = async () => {
+      const url = await getPendingDeeplink();
+      if (!url) return;
+
+      await setPendingDeeplink(null);
+      const parsed = parseDeepLinkUrl(url);
+      if (!parsed) return;
+
+      // Esperar a que la navegación normal llegue a MainTabs (splash/login flow)
+      let attempts = 0;
+      const maxAttempts = 20; // ~6 segundos máximo
+
+      const tryNavigate = () => {
+        attempts++;
+        if (!navigationRef.isReady() || attempts > maxAttempts) return;
+
+        const state = navigationRef.getRootState();
+        const currentRoute = state?.routes?.[state.index];
+
+        if (currentRoute?.name === 'MainTabs') {
+          // Ya estamos en MainTabs, navegar al destino del deep link
+          navigationRef.navigate(parsed.screen as never, parsed.params as never);
+        } else {
+          // Aún no llegamos a MainTabs, reintentar
+          setTimeout(tryNavigate, 300);
         }
-      });
-    }
+      };
+
+      setTimeout(tryNavigate, 500);
+    };
+
+    processPending();
   }, [userToken, initialUrlChecked]);
+
+  // 3. Escuchar deep links en tiempo de ejecución (app abierta o en background)
+  useEffect(() => {
+    const subscription = Linking.addEventListener('url', async ({ url }) => {
+      const parsed = parseDeepLinkUrl(url);
+      if (!parsed) return;
+
+      if (!userToken) {
+        // Sin sesión: guardar para después del login
+        await setPendingDeeplink(url);
+        return;
+      }
+
+      // Con sesión: navegar directamente (MainTabs ya está en el stack)
+      if (navigationRef.isReady()) {
+        navigationRef.navigate(parsed.screen as never, parsed.params as never);
+      }
+    });
+
+    return () => subscription.remove();
+  }, [userToken]);
 
   useEffect(() => {
     notificationListener.current = Notifications.addNotificationReceivedListener(notification => {

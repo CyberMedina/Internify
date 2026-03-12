@@ -19,22 +19,7 @@ import { useSaved } from '../context/SavedContext';
 import Chip from '../components/Chip';
 import GradientButton from '../components/GradientButton';
 import RangeSlider from '../components/RangeSlider';
-
-const mapVacancyToJob = (v: Vacancy): Job => ({
-  id: v.id.toString(),
-  title: v.title,
-  company: v.company.name,
-  location: v.location || 'N/A',
-  tags: v.tags && v.tags.length > 0 ? v.tags : (v.requirements && v.requirements.length > 0 ? v.requirements : (v.academic_programs || [])),
-  applicants: v.applicants_count ?? 0,
-  salary: v.salary_range ? `C$${v.salary_range}` : 'Anónimo',
-  avatars: [],
-  companyLogo: v.company.logo || v.company.photo,
-  postedTime: v.dates?.posted_human,
-  isApplied: v.is_applied,
-  isSaved: v.is_saved,
-  match: v.match_percentage
-});
+import { mapVacancyToJob } from '../utils/mapVacancyToJob';
 
 export default function SearchScreen() {
   const { colors, spacing, radius, typography } = useTheme();
@@ -449,8 +434,8 @@ export default function SearchScreen() {
                   </TouchableOpacity>
                 </View>
                 <View style={{ marginTop: spacing(1) }}>
-                  {recentlyViewed.map((job) => (
-                    <JobCardSmall key={job.id} job={job} applicantsLabel="Postulantes" />
+                  {recentlyViewed.map((job, index) => (
+                    <JobCardSmall key={`recently-viewed-${job.id}-${index}`} job={job} applicantsLabel="Postulantes" />
                   ))}
                 </View>
               </View>
@@ -508,8 +493,8 @@ export default function SearchScreen() {
                   <Text style={{ color: colors.textSecondary, marginBottom: spacing(1) }}>
                     {results.length} resultados encontrados
                   </Text>
-                  {results.map((job) => (
-                    <JobCardSmall key={job.id} job={job} applicantsLabel="Postulantes" />
+                  {results.map((job, index) => (
+                    <JobCardSmall key={`search-result-${job.id}-${index}`} job={job} applicantsLabel="Postulantes" />
                   ))}
                 </>
               ) : (

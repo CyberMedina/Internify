@@ -1,10 +1,11 @@
 import React, { memo } from 'react';
 import { Image, View, Text } from 'react-native';
 
-type Props = { avatars: string[]; max?: number };
-const AvatarGroup = memo(({ avatars, max = 4 }: Props) => {
-  const visible = avatars.slice(0, max);
-  const extra = avatars.length - visible.length;
+type Props = { avatars?: string[]; max?: number };
+const AvatarGroup = memo(({ avatars = [], max = 4 }: Props) => {
+  const safeAvatars = Array.isArray(avatars) ? avatars : [];
+  const visible = safeAvatars.slice(0, max);
+  const extra = safeAvatars.length - visible.length;
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
       {visible.map((uri, i) => (

@@ -6,6 +6,7 @@ import { authEvents } from '../utils/authEvents';
 import { useToast } from './ToastContext';
 import { api } from '../services/api';
 import { navigationRef } from '../navigation/navigationRef';
+import { ENV } from '../config/env';
 
 interface AuthContextType {
   userToken: string | null;
@@ -132,7 +133,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (response.data.profile && response.data.profile.photo) {
            response.data.profile.photo = response.data.profile.photo.replace(
              'https://internifyutesis.test:8443', 
-             'https://overfoul-domingo-unharmable.ngrok-free.dev'
+             ENV.BASE_URL
            );
         }
         

@@ -136,14 +136,14 @@ const JobCardLarge = memo(({ job, showBookmark = true, style }: Props) => {
       <View
         style={{
           flexDirection: 'row',
-          flexWrap: job.tags.length === 3 ? 'nowrap' : 'wrap',
+          flexWrap: Array.isArray(job.tags) && job.tags.length === 3 ? 'nowrap' : 'wrap',
           marginTop: spacing(1),
-          justifyContent: job.tags.length === 3 ? 'space-between' : 'flex-start',
-          columnGap: job.tags.length === 3 ? 8 : 0,
+          justifyContent: Array.isArray(job.tags) && job.tags.length === 3 ? 'space-between' : 'flex-start',
+          columnGap: Array.isArray(job.tags) && job.tags.length === 3 ? 8 : 0,
           rowGap: spacing(1),
         }}
       >
-        {job.tags.map((t, idx) => (
+        {Array.isArray(job.tags) && job.tags.map((t, idx) => (
           <Chip
             key={t}
             label={t}
@@ -152,15 +152,15 @@ const JobCardLarge = memo(({ job, showBookmark = true, style }: Props) => {
         ))}
       </View>
 
-      <View style={{ borderTopWidth: 1, borderTopColor: colors.border, paddingTop: spacing(1) }}>
+      <View style={{ borderTopWidth: 1, borderTopColor: colors.border, paddingTop: spacing(1), marginTop: spacing(1) }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <AvatarGroup avatars={job.avatars} />
           <Text style={{ textAlign: 'right' }}>
-            {job.salary === 'Anónimo' ? (
+            {(!job.salary || job.salary === 'Anónimo') ? (
               <Text style={{ color: colors.textSecondary, fontWeight: '700', fontSize: typography.sizes.md }}>Anónimo</Text>
             ) : (
               <>
-                <Text style={{ color: colors.primary, fontWeight: '700', fontSize: typography.sizes.md, letterSpacing: 0.2 }}>{job.salary.replace(' /mes', '')}</Text>
+                <Text style={{ color: colors.primary, fontWeight: '700', fontSize: typography.sizes.md, letterSpacing: 0.2 }}>{typeof job.salary === 'string' ? job.salary.replace(' /mes', '') : job.salary}</Text>
                 <Text style={{ color: colors.textSecondary, fontSize: typography.sizes.sm }}> / mes</Text>
               </>
             )}

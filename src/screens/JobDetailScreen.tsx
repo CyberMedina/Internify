@@ -22,10 +22,13 @@ import { useSaved } from '../context/SavedContext';
 import { useApplications } from '../context/ApplicationsContext';
 import JobDetailSkeleton from './JobDetailSkeleton';
 import { getInitials } from '../utils/stringUtils';
+import { adjustColorForDarkMode } from '../utils/colorUtils';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { addRecentlyViewed } from '../utils/storage';
 import GradientButton from '../components/GradientButton';
 import BookmarkButton from '../components/BookmarkButton';
+import { ENV } from '../config/env';
+import { mapVacancyToJob } from '../utils/mapVacancyToJob';
 
 export default function JobDetailScreen() {
   const { colors, spacing, radius, typography, isDark } = useTheme();
@@ -58,13 +61,20 @@ export default function JobDetailScreen() {
   const [loading, setLoading] = React.useState(true);
   const [sharing, setSharing] = React.useState(false);
   const isSharing = React.useRef(false);
-  const [dominantColor, setDominantColor] = React.useState<string>(colors.primary);
+  const [rawDominantColor, setRawDominantColor] = React.useState<string>(colors.primary);
+  const [colorsReady, setColorsReady] = React.useState(false);
 
+  // Guardar en "Vistos Recientemente" solo cuando tengamos datos completos del API
   React.useEffect(() => {
-    if (job) {
-      addRecentlyViewed(job);
+    if (!vacancy) return;
+    const mapped = mapVacancyToJob(vacancy);
+    // Si el job vino de la navegación del Home/Search (con tags correctos del listado),
+    // preservar esos tags ya que el endpoint de detalle puede no traerlos igual.
+    if (job?.tags && job.tags.length > 0) {
+      mapped.tags = job.tags;
     }
-  }, [job]);
+    addRecentlyViewed(mapped);
+  }, [vacancy]);
 
   React.useEffect(() => {
     const fetchDetail = async () => {
@@ -89,37 +99,52 @@ export default function JobDetailScreen() {
   const companyLogo = vacancy?.company?.logo ?? vacancy?.company?.photo ?? job?.companyLogo;
 
   React.useEffect(() => {
+    if (!vacancy) {
+      setColorsReady(false);
+      return;
+    }
+
+    let cancelled = false;
+    const logo = vacancy?.company?.logo ?? vacancy?.company?.photo ?? job?.companyLogo;
+
     const fetchColors = async () => {
-      if (companyLogo) {
+      if (logo) {
         try {
-          const result = await getColors(companyLogo, {
+          const result = await getColors(logo, {
             fallback: '#E6232C',
             cache: true,
-            key: companyLogo,
+            key: logo,
           });
-          
+
+          if (cancelled) return;
           if (Platform.OS === 'android') {
             // @ts-ignore
-            setDominantColor(result.dominant || result.vibrant || '#E6232C');
+            setRawDominantColor(result.dominant || result.vibrant || '#E6232C');
           } else {
             // @ts-ignore
-            setDominantColor(result.primary || '#E6232C');
+            setRawDominantColor(result.primary || '#E6232C');
           }
         } catch (e) {
+          if (cancelled) return;
           console.log('Error extracting colors', e);
-          setDominantColor(colors.primary);
+          setRawDominantColor(colors.primary);
         }
       } else {
-        setDominantColor(colors.primary);
+        setRawDominantColor(colors.primary);
       }
+      if (!cancelled) setColorsReady(true);
     };
-    
-    fetchColors();
-  }, [companyLogo, colors.primary]);
 
-  if (loading && !vacancy) {
+    fetchColors();
+    return () => { cancelled = true; };
+  }, [vacancy, colors.primary]);
+
+  if (loading || !vacancy || !colorsReady) {
     return <JobDetailSkeleton />;
   }
+
+  // Color dominante ajustado para que sea visible en modo oscuro
+  const dominantColor = isDark ? adjustColorForDarkMode(rawDominantColor) : rawDominantColor;
 
   const data = {
     title: vacancy?.title ?? job?.title ?? 'Cargando...',
@@ -169,7 +194,7 @@ export default function JobDetailScreen() {
     // Obtener ID real
     const vacancyId = vacancy?.id || job?.id;
     // URL para deep linking
-    const shareUrl = vacancyId ? `https://overfoul-domingo-unharmable.ngrok-free.dev/vacancies/${vacancyId}` : '';
+    const shareUrl = vacancyId ? `${ENV.BASE_URL}/vacancies/${vacancyId}` : '';
     
     // Mensaje mejorado con link
     const message = `¡Mira esta vacante de ${data.title} en ${data.company}! \n\nUbicación: ${data.location}\nSalario: ${data.salary}\n\nAplica aquí: ${shareUrl}`;
@@ -179,7 +204,7 @@ export default function JobDetailScreen() {
         // Endpoint para obtener la imagen generada
         // Usamos la API URL base definida en services/api.ts pero la reconstruimos aquí o usamos una variable de entorno
         // Por ahora mantenemos la URL existente pero es ideal centralizarla
-        const imageUrl = `https://overfoul-domingo-unharmable.ngrok-free.dev/api/vacancies/${vacancyId}/og-image`;
+        const imageUrl = `${ENV.API_URL}/vacancies/${vacancyId}/og-image`;
         // Usar cacheDirectory con timestamp para evitar colisiones y problemas de caché
         const filename = `vacancy-${vacancyId}-${Date.now()}.png`;
         const fileUri = FileSystem.cacheDirectory + filename;
@@ -259,7 +284,7 @@ export default function JobDetailScreen() {
     <View style={{ flex: 1, backgroundColor: colors.card }}>
       <LinearGradient
         colors={isDark 
-          ? [`${dominantColor}40`, colors.card] 
+          ? [`${dominantColor}30`, colors.card] 
           : [`${dominantColor}26`, `${dominantColor}00`]
         }
         style={{
@@ -298,7 +323,7 @@ export default function JobDetailScreen() {
                 }
               }}
               size={18}
-              color={dominantColor}
+              color={colors.textSecondary}
               activeColor={dominantColor}
             />
           </View>
@@ -309,9 +334,9 @@ export default function JobDetailScreen() {
               style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', marginLeft: spacing(1), opacity: sharing ? 0.5 : 1 }}
             >
               {sharing ? (
-                <ActivityIndicator size="small" color={colors.text} />
+                <ActivityIndicator size="small" color={dominantColor} />
               ) : (
-                <Feather name="share-2" size={18} color={colors.text} />
+                <Feather name="share-2" size={18} color={dominantColor} />
               )}
             </TouchableOpacity>
           )}

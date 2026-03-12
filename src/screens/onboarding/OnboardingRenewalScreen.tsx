@@ -20,18 +20,20 @@ export default function OnboardingRenewalScreen({ navigation }: Props) {
     <ScreenContainer safeTop safeBottom style={styles.container}>
       <View style={styles.content}>
         <Animated.View entering={FadeInUp.delay(200).duration(1000)} style={styles.iconContainer}>
-           <LinearGradient
-              colors={[colors.primary, '#60A5FA']}
-              style={styles.iconBackground}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-           >
-              <Image 
-                source={require('../../assets/images/InternifyNoLogo.png')} 
-                style={{ width: 70, height: 70, tintColor: '#FFF' }} 
+          <LinearGradient
+            colors={[colors.primary, '#60A5FA']}
+            style={styles.iconBackground}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+          >
+            <View style={styles.logoInnerCircle}>
+              <Image
+                source={require('../../assets/images/uni-logo.png')}
+                style={{ width: 60, height: 60 }}
                 resizeMode="contain"
               />
-           </LinearGradient>
+            </View>
+          </LinearGradient>
         </Animated.View>
 
         <Animated.View entering={FadeInDown.delay(400).duration(800)} style={styles.textContainer}>
@@ -42,9 +44,9 @@ export default function OnboardingRenewalScreen({ navigation }: Props) {
             Para mejorar tu experiencia profesional
           </Text>
         </Animated.View>
-        
+
         <Animated.View entering={FadeInDown.delay(800).duration(800)} style={styles.buttonContainer}>
-           <GradientButton
+          <GradientButton
             onPress={() => navigation.navigate('Process')}
             title="Siguiente"
             icon={<FontAwesome5 name="arrow-right" size={16} color="#FFF" />}
@@ -83,6 +85,19 @@ const styles = StyleSheet.create({
     borderRadius: 60,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  logoInnerCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   textContainer: {
     alignItems: 'center',

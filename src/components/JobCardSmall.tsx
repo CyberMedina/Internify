@@ -65,12 +65,12 @@ const JobCardSmall = memo(({ job, applicantsLabel, bookmarked, onToggleBookmark,
         )}
       </View>
 
-      <View style={{ flexDirection: 'row', marginTop: spacing(1), alignItems: 'center' }}>
-        {job.tags.slice(0, 2).map((t) => (
-          <Chip key={t} label={t} />
+      <View style={{ flexDirection: 'row', marginTop: spacing(1), alignItems: 'center', flexWrap: 'wrap' }}>
+        {Array.isArray(job.tags) && job.tags.slice(0, 2).map((t) => (
+          <Chip key={t} label={t} style={{ flexShrink: 1 }} />
         ))}
-        {job.tags.length > 2 ? (
-          <Chip label={`+${job.tags.length - 2}`} variant="subtle" />
+        {Array.isArray(job.tags) && job.tags.length > 2 ? (
+          <Chip label={`+${job.tags.length - 2}`} variant="subtle" style={{ flexShrink: 0 }} />
         ) : null}
       </View>
 
@@ -78,11 +78,11 @@ const JobCardSmall = memo(({ job, applicantsLabel, bookmarked, onToggleBookmark,
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <AvatarGroup avatars={job.avatars} />
           <Text style={{ textAlign: 'right' }}>
-            {job.salary === 'Anónimo' ? (
+            {(!job.salary || job.salary === 'Anónimo') ? (
               <Text style={{ color: colors.textSecondary, fontWeight: '700', fontSize: typography.sizes.md }}>Anónimo</Text>
             ) : (
               <>
-                <Text style={{ color: colors.primary, fontWeight: '700', fontSize: typography.sizes.md, letterSpacing: 0.2 }}>{job.salary.replace(' /mes', '')}</Text>
+                <Text style={{ color: colors.primary, fontWeight: '700', fontSize: typography.sizes.md, letterSpacing: 0.2 }}>{typeof job.salary === 'string' ? job.salary.replace(' /mes', '') : job.salary}</Text>
                 <Text style={{ color: colors.textSecondary, fontSize: typography.sizes.sm }}> / mes</Text>
               </>
             )}

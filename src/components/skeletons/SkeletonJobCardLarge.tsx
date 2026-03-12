@@ -12,24 +12,20 @@ interface Props {
 }
 
 export default function SkeletonJobCardLarge({ style }: Props) {
-  const { spacing, colors } = useTheme();
+  const { spacing, colors, isDark } = useTheme();
   
   return (
     <View
       style={[{
         width: DEFAULT_WIDTH,
         backgroundColor: colors.surface,
-        borderRadius: 24, // Matched JobCardLarge usually higher radius
+        borderRadius: 24,
         padding: spacing(2),
-        marginRight: spacing(2), // Keep default margin but allow override
-        // Shadow matching ApplicationCard/JobCard
-        shadowColor: colors.shadow, 
-        shadowOpacity: 0.08, 
-        shadowRadius: 12, 
-        shadowOffset: { width: 0, height: 4 },
-        elevation: 3,
-        borderWidth: 1,
-        borderColor: colors.border,
+        marginRight: spacing(2),
+        ...(isDark ? {
+          borderWidth: 1,
+          borderColor: colors.border,
+        } : {}),
       }, style]}
     >
       {/* Header: logo + title + match badge */}

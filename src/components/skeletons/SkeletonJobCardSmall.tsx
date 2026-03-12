@@ -10,21 +10,18 @@ interface Props {
 }
 
 export default function SkeletonJobCardSmall({ shimmer = true, active = true, style }: Props) {
-  const { spacing, colors, radius } = useTheme();
+  const { spacing, colors, radius, isDark } = useTheme();
   
   return (
     <View style={[{ 
       backgroundColor: colors.surface, 
       padding: spacing(2), 
-      borderRadius: 16, // Matches cards 
+      borderRadius: 16,
       marginBottom: spacing(1.5),
-      borderWidth: 1,
-      borderColor: colors.border,
-      // Subtle shadow
-      shadowColor: colors.shadow,
-      shadowOpacity: 0.05,
-      shadowRadius: 8,
-      elevation: 2
+      ...(isDark ? {
+        borderWidth: 1,
+        borderColor: colors.border,
+      } : {}),
     }, style]}>
       
       {/* Header */}

@@ -14,6 +14,7 @@ import { registerForPushNotificationsAsync } from '../utils/notifications';
 import * as Notifications from 'expo-notifications';
 import { getNotificationConsentGranted } from '../utils/storage';
 import Toast, { ToastType } from '../components/Toast';
+import { ENV } from '../config/env';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Login'>;
 
@@ -37,7 +38,7 @@ export default function LoginScreen({ navigation }: Props) {
     setToast(prev => ({ ...prev, visible: false }));
   };
 
-  const BASE_AUTH_URL = 'https://overfoul-domingo-unharmable.ngrok-free.dev/api/auth/microsoft/';
+  const BASE_AUTH_URL = `${ENV.API_URL}/auth/microsoft/`;
 
   const handleLogin = async () => {
     try {

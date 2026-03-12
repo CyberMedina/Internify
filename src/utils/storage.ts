@@ -82,7 +82,20 @@ export const removeRecentSearch = async (query: string) => {
 export const getRecentlyViewed = async (): Promise<Job[]> => {
   try {
     const json = await AsyncStorage.getItem(RECENTLY_VIEWED_KEY);
-    return json ? JSON.parse(json) : [];
+    if (!json) return [];
+    const jobs: Job[] = JSON.parse(json);
+    // Sanitizar: asegurar que cada job tenga campos válidos
+    return jobs
+      .filter(j => j && j.id && j.title)
+      .map(j => ({
+        ...j,
+        tags: Array.isArray(j.tags) ? j.tags : [],
+        avatars: Array.isArray(j.avatars) ? j.avatars : [],
+        salary: j.salary || 'Anónimo',
+        company: j.company || '',
+        location: j.location || '',
+        applicants: j.applicants ?? 0,
+      }));
   } catch (e) {
     return [];
   }
