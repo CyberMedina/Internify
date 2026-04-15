@@ -1,0 +1,58 @@
+name: Build Unsigned iOS IPA
+
+on:
+  workflow_dispatch: # Te permite ejecutar este build manualmente desde la pestaña "Actions" de Github
+
+jobs:
+  build:
+    name: Build Unsigned IPA
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Generate iOS directory
+        run: npx expo prebuild --platform ios --clean
+
+      - name: Install CocoaPods
+        run: |
+          cd ios
+          pod install
+
+      - name: Build Unsigned App
+        run: |
+          cd ios
+          xcodebuild \
+            -workspace Internify.xcworkspace \
+            -scheme Internify \
+            -configuration Release \
+            -sdk iphoneos \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            clean build \
+            CONFIGURATION_BUILD_DIR="$(pwd)/build"
+
+      - name: Package App to IPA
+        run: |
+          cd ios/build
+          mkdir Payload
+          # Mueve la app a una carpeta Payload para empaquetarla correctamente con la estructura de un ipa
+          mv Internify.app Payload/
+          zip -qr Internify.ipa Payload
+
+      - name: Upload IPA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Unsigned-Internify-IPA
+          path: ios/build/Internify.ipa
