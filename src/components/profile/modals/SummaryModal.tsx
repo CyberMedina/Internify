@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity, TextInput, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { useTheme } from '../../../theme/ThemeContext';
 
+const MIN_LENGTH = 20;
+const MAX_LENGTH = 120;
+
 interface SummaryModalProps {
   visible: boolean;
   onClose: () => void;
@@ -20,7 +23,12 @@ export default function SummaryModal({ visible, onClose, onSave, initialSummary 
     }
   }, [visible, initialSummary]);
 
+  const currentLength = summary.length;
+  const isValid = currentLength >= MIN_LENGTH && currentLength <= MAX_LENGTH;
+  const isError = currentLength > 0 && currentLength < MIN_LENGTH;
+
   const handleSave = () => {
+    if (!isValid) return;
     onSave(summary);
   };
 
@@ -42,13 +50,14 @@ export default function SummaryModal({ visible, onClose, onSave, initialSummary 
           </Text>
           
           <ScrollView showsVerticalScrollIndicator={false}>
-            <View style={{ marginBottom: 24 }}>
+            <View style={{ marginBottom: 8 }}>
                 <TextInput
                     style={[
                         styles.input, 
                         { 
                             color: colors.text, 
-                            borderColor: colors.border, 
+                            borderColor: isError ? colors.error : (isValid ? colors.primary : colors.border),
+                            borderWidth: isValid || isError ? 1.5 : 1,
                             backgroundColor: colors.surface,
                             minHeight: 120,
                             textAlignVertical: 'top'
@@ -60,10 +69,26 @@ export default function SummaryModal({ visible, onClose, onSave, initialSummary 
                     onChangeText={setSummary}
                     multiline={true}
                     numberOfLines={6}
+                    maxLength={MAX_LENGTH}
                 />
+                <View style={{ alignSelf: 'flex-end', marginTop: 4 }}>
+                    <Text style={{ 
+                        color: isError ? colors.error : (isValid ? colors.primary : colors.textSecondary),
+                        fontSize: 12,
+                        fontWeight: isValid ? '600' : '400'
+                    }}>
+                        {currentLength} / {MAX_LENGTH}
+                    </Text>
+                </View>
             </View>
 
-            <View style={styles.modalButtons}>
+            {isError && (
+                <Text style={{ color: colors.error, fontSize: 12, marginBottom: 16, marginLeft: 4 }}>
+                    ⚠️ El resumen es muy corto (mínimo {MIN_LENGTH} caracteres)
+                </Text>
+            )}
+
+            <View style={[styles.modalButtons, { marginTop: isError ? 4 : 16 }]}>
                 <TouchableOpacity 
                     style={[styles.modalButton, { backgroundColor: colors.border }]} 
                     onPress={onClose}
@@ -72,10 +97,11 @@ export default function SummaryModal({ visible, onClose, onSave, initialSummary 
                 </TouchableOpacity>
                 
                 <TouchableOpacity 
-                    style={[styles.modalButton, { backgroundColor: colors.primary }]} 
+                    style={[styles.modalButton, { backgroundColor: isValid ? colors.primary : colors.border }]} 
                     onPress={handleSave}
+                    disabled={!isValid}
                 >
-                    <Text style={{ color: '#FFF', fontWeight: 'bold' }}>Guardar</Text>
+                    <Text style={{ color: isValid ? '#FFF' : colors.textSecondary, fontWeight: 'bold' }}>Guardar</Text>
                 </TouchableOpacity>
             </View>
           </ScrollView>

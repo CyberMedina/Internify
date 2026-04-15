@@ -5,7 +5,7 @@ import Skeleton from '../components/Skeleton';
 import ScreenContainer from '../components/ScreenContainer';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-export default function JobDetailSkeleton() {
+export default function JobDetailSkeleton({ hideActions }: { hideActions?: boolean }) {
   const { colors, spacing, radius } = useTheme();
   const insets = useSafeAreaInsets();
 
@@ -84,9 +84,11 @@ export default function JobDetailSkeleton() {
       </ScreenContainer>
 
       {/* Fixed bottom CTA */}
-      <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: spacing(2), paddingBottom: insets.bottom + spacing(1.5), paddingTop: spacing(1), backgroundColor: colors.surface, borderTopColor: colors.border, borderTopWidth: 1 }}>
-        <Skeleton width={'100%'} height={56} borderRadius={20} shimmer />
-      </View>
+      {!hideActions && (
+        <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: spacing(2), paddingBottom: insets.bottom + spacing(1.5), paddingTop: spacing(1), backgroundColor: colors.surface, borderTopColor: colors.border, borderTopWidth: 1 }}>
+          <Skeleton width={'100%'} height={56} borderRadius={20} shimmer />
+        </View>
+      )}
     </View>
   );
 }

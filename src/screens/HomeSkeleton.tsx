@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, ScrollView, Dimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../theme/ThemeContext';
 import Skeleton from '../components/Skeleton';
 import SkeletonChip from '../components/skeletons/SkeletonChip';
@@ -22,13 +23,22 @@ export default function HomeSkeleton() {
       {/* Header Absoluto Simulado */}
       <View style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 100 }}>
         {/* Parte Azul / Header Principal */}
-        <View style={{ 
-          backgroundColor: colors.primary, 
-          paddingTop: insets.top + spacing(2), 
-          paddingBottom: spacing(2),
-          borderBottomLeftRadius: 30,
-          borderBottomRightRadius: 30,
-        }}>
+        <LinearGradient
+          colors={[colors.primary, '#4338ca']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={{ 
+            paddingTop: insets.top + spacing(2), 
+            paddingBottom: spacing(2),
+            borderBottomLeftRadius: 30,
+            borderBottomRightRadius: 30,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.15,
+            shadowRadius: 12,
+            elevation: 8,
+          }}
+        >
           {/* Fila Avatar + Saludo */}
           <View style={{ paddingHorizontal: spacing(2), flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing(1) }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
@@ -55,7 +65,7 @@ export default function HomeSkeleton() {
                <Skeleton width={44} height={44} borderRadius={12} shimmer color="rgba(255,255,255,0.2)" />
             </View>
           </View>
-        </View>
+        </LinearGradient>
 
         {/* Chips Sticky (Debajo del Header Azul) */}
         <View style={{ backgroundColor: colors.card, paddingBottom: spacing(1.5), paddingTop: spacing(2.5) }}>

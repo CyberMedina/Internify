@@ -16,6 +16,7 @@ import { ErrorBoundary } from 'src/components/ErrorBoundary';
 import { ToastProvider } from 'src/context/ToastContext';
 import { navigationRef } from 'src/navigation/navigationRef';
 import * as Linking from 'expo-linking';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { ENV } from './src/config/env';
 
 // Configuración de notificaciones en primer plano: Silenciar alerta visual (banner) y sonido
@@ -204,6 +205,7 @@ function Root() {
 
 export default function App() {
   return (
+    <GestureHandlerRootView style={{ flex: 1 }}>
     <SafeAreaProvider>
       <ErrorBoundary>
         <ThemeProvider>
@@ -223,5 +225,6 @@ export default function App() {
         </ThemeProvider>
       </ErrorBoundary>
     </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }

@@ -38,6 +38,7 @@ export default function JobDetailScreen() {
   // Deep linking support
   const passedJob = route.params?.job as Job | undefined;
   const idFromParams = route.params?.id;
+  const hideActions = route.params?.hideActions as boolean | undefined;
   
   // Definimos jobId ya sea del objeto job o del parametro directo
   const jobId = passedJob?.id || idFromParams;
@@ -140,7 +141,7 @@ export default function JobDetailScreen() {
   }, [vacancy, colors.primary]);
 
   if (loading || !vacancy || !colorsReady) {
-    return <JobDetailSkeleton />;
+    return <JobDetailSkeleton hideActions={hideActions} />;
   }
 
   // Color dominante ajustado para que sea visible en modo oscuro
@@ -520,7 +521,7 @@ export default function JobDetailScreen() {
       </ScreenContainer>
 
       {/* Fixed bottom CTA */}
-      <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: spacing(2), paddingBottom: insets.bottom + spacing(1.5), paddingTop: spacing(1), backgroundColor: colors.surface, borderTopColor: colors.border, borderTopWidth: 1 }}>
+      {!hideActions && <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: spacing(2), paddingBottom: insets.bottom + spacing(1.5), paddingTop: spacing(1), backgroundColor: colors.surface, borderTopColor: colors.border, borderTopWidth: 1 }}>
         {data.hasApplied ? (
           <TouchableOpacity
             activeOpacity={0.9}
@@ -641,7 +642,7 @@ export default function JobDetailScreen() {
             gradientColors={[dominantColor, dominantColor]}
           />
         )}
-      </View>
+      </View>}
 
       {/* Modal de Validación de CV */}
       <Modal

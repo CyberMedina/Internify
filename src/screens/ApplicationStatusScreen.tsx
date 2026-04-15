@@ -29,21 +29,27 @@ const ApplicationStatusScreen = () => {
 
   const [application, setApplication] = useState<Application>(initialApplication);
   const [loading, setLoading] = useState(!initialApplication.history);
-  const [bannerColor, setBannerColor] = useState<string>(colors.primary);
+  const [bannerColor, setBannerColor] = useState<string | null>(null);
 
   useEffect(() => {
-     const fetchColor = async () => {
-        // Priority: company_photo on vacancy level (full URL) -> company logo/photo
-        let logo = (application.vacancy as any).company_photo || 
-                     application.vacancy.company.logo || 
-                     application.vacancy.company.photo || 
-                     application.vacancy.company.user_detail?.pf_photo;
-        
-        const color = await extractDominantColor(logo, colors.primary);
-        setBannerColor(color);
-     };
-     fetchColor();
-  }, [application.vacancy]);
+    let cancelled = false;
+    const timeout = setTimeout(() => { if (!cancelled) setBannerColor(colors.primary); }, 3000);
+
+    const fetchColor = async () => {
+      const vacancy = initialApplication.vacancy;
+      const logo = (vacancy as any).company_photo ||
+                   vacancy.company.logo ||
+                   vacancy.company.photo ||
+                   vacancy.company.user_detail?.pf_photo;
+      const color = await extractDominantColor(logo, colors.primary);
+      clearTimeout(timeout);
+      if (!cancelled) setBannerColor(color);
+    };
+
+    fetchColor();
+    return () => { cancelled = true; clearTimeout(timeout); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     const sortHistory = (history: ApplicationHistory[]) => {
@@ -229,10 +235,18 @@ const ApplicationStatusScreen = () => {
         </Text>
       </View>
 
-      <ScrollView contentContainerStyle={styles.content}>
-        {/* Main Status Card */}
-        <View style={styles.mainCardContainer}>
-            {/* Banner Section */}
+      {bannerColor === null ? (
+        <View style={styles.fullLoader}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      ) : (
+        <ScrollView contentContainerStyle={styles.content}>
+          {/* Main Status Card */}
+          <TouchableOpacity
+            style={styles.mainCardContainer}
+            onPress={() => navigation.navigate('JobDetail' as any, { job: application.vacancy, hideActions: true })}
+            activeOpacity={0.9}
+          >
             <View style={[styles.cardBanner, { backgroundColor: bannerColor }]}>
                 <View style={styles.companyInfoRow}>
                     <View style={styles.logoContainer}>
@@ -256,30 +270,34 @@ const ApplicationStatusScreen = () => {
                             {application.vacancy.company.name}
                         </Text>
                     </View>
+                    <View style={styles.externalIconContainer}>
+                        <Feather name="external-link" size={16} color="rgba(255,255,255,0.7)" />
+                    </View>
                 </View>
             </View>
-        </View>
+          </TouchableOpacity>
 
-        {/* Timeline */}
-        <View style={styles.timelineContainer}>
-          <Text style={[typography.h6, { marginBottom: spacing.lg, color: colors.text, paddingLeft: 8 }]}>
-            Historial
-          </Text>
-          {loading ? (
-            <ActivityIndicator size="large" color={colors.primary} />
-          ) : (
-            application.history?.length ? (
-               application.history.map((item, index) => 
-                  renderHistoryItem(item, index, application.history!.length)
-                )
+          {/* Timeline */}
+          <View style={styles.timelineContainer}>
+            <Text style={[typography.h6, { marginBottom: spacing.lg, color: colors.text, paddingLeft: 8 }]}>
+              Historial
+            </Text>
+            {loading ? (
+              <ActivityIndicator size="large" color={colors.primary} />
             ) : (
-                <View style={{ padding: 16, alignItems: 'center' }}>
-                    <Text style={{ color: colors.textSecondary }}>No hay historial disponible.</Text>
-                </View>
-            )
-          )}
-        </View>
-      </ScrollView>
+              application.history?.length ? (
+                 application.history.map((item, index) => 
+                    renderHistoryItem(item, index, application.history!.length)
+                  )
+              ) : (
+                  <View style={{ padding: 16, alignItems: 'center' }}>
+                      <Text style={{ color: colors.textSecondary }}>No hay historial disponible.</Text>
+                  </View>
+              )
+            )}
+          </View>
+        </ScrollView>
+      )}
     </ScreenContainer>
   );
 };
@@ -315,6 +333,11 @@ const styles = StyleSheet.create({
   cardBanner: {
     padding: 24,
   },
+  fullLoader: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   companyInfoRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -345,6 +368,10 @@ const styles = StyleSheet.create({
   },
   companyTexts: {
     flex: 1,
+  },
+  externalIconContainer: {
+    padding: 4,
+    marginLeft: 8,
   },
   vacancyTitle: {
     fontSize: 18,

@@ -18,7 +18,7 @@ export type RootStackParamList = {
   NotificationConsent: undefined;
   Onboarding: undefined;
   MainTabs: undefined;
-  JobDetail: { job: any } | undefined;
+  JobDetail: { job?: any; id?: string; hideActions?: boolean } | undefined;
   ApplicationStatus: { application: Application; from?: string };
 };
 

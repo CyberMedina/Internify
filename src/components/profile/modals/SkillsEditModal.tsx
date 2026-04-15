@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Modal,
   View,
@@ -9,9 +9,12 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useTheme } from '../../../theme/ThemeContext';
+import { useAuth } from '../../../context/AuthContext';
+import { skillService, Skill } from '../../../services/skillService';
 
 interface SkillsEditModalProps {
   visible: boolean;
@@ -27,21 +30,63 @@ export const SkillsEditModal: React.FC<SkillsEditModalProps> = ({
   initialSkills,
 }) => {
   const { colors, spacing, radius, typography } = useTheme();
+  const { userToken } = useAuth();
   const [skills, setSkills] = useState<string[]>([]);
   const [inputText, setInputText] = useState('');
+  const [suggestedSkills, setSuggestedSkills] = useState<Skill[]>([]);
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
+  const [searchResults, setSearchResults] = useState<Skill[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+
+  const skillsScrollRef = useRef<ScrollView>(null);
 
   useEffect(() => {
     if (visible) {
       setSkills([...initialSkills]);
       setInputText('');
+      setSearchResults([]);
+      loadSuggestions();
     }
   }, [visible, initialSkills]);
 
-  const handleAddSkill = () => {
-    const trimmedInput = inputText.trim();
-    if (trimmedInput && !skills.includes(trimmedInput)) {
-      setSkills([...skills, trimmedInput]);
+  const loadSuggestions = async () => {
+    if (!userToken) return;
+    setIsLoadingSuggestions(true);
+    try {
+      const suggestions = await skillService.getSuggestedSkills(userToken);
+      setSuggestedSkills(suggestions);
+    } catch (error) {
+      console.error('Error cargando sugerencias de habilidades:', error);
+    } finally {
+      setIsLoadingSuggestions(false);
+    }
+  };
+
+  const handleSearchSkills = async (text: string) => {
+    setInputText(text);
+    if (text.length >= 2 && userToken) {
+      setIsSearching(true);
+      try {
+        const results = await skillService.searchSkills(userToken, text);
+        setSearchResults(results.filter(r => !skills.includes(r.name)));
+      } catch (error) {
+        console.error('Error buscando habilidades:', error);
+      } finally {
+        setIsSearching(false);
+      }
+    } else {
+      setSearchResults([]);
+    }
+  };
+
+  const handleAddSkill = (name?: string) => {
+    const skillName = (name ?? inputText).trim();
+    if (skillName && !skills.includes(skillName)) {
+      setSkills(prev => [...prev, skillName]);
       setInputText('');
+      setSearchResults([]);
+      // Scroll al final para mostrar la habilidad recién agregada
+      setTimeout(() => skillsScrollRef.current?.scrollToEnd({ animated: true }), 50);
     }
   };
 
@@ -78,7 +123,7 @@ export const SkillsEditModal: React.FC<SkillsEditModalProps> = ({
             styles.modalContent,
             {
               backgroundColor: colors.surface,
-              borderRadius: radius.xl,
+              borderRadius: radius.lg,
               padding: spacing(4),
               borderColor: colors.border,
               borderWidth: 1,
@@ -91,154 +136,179 @@ export const SkillsEditModal: React.FC<SkillsEditModalProps> = ({
               { color: colors.text, fontSize: typography.sizes.xl },
             ]}
           >
-            Edit Skills
+            Editar habilidades
           </Text>
 
           {/* Skills List */}
-          <ScrollView
-            style={styles.skillsScroll}
-            contentContainerStyle={styles.skillsContainer}
-            keyboardShouldPersistTaps="handled"
-          >
-            {skills.map((skill, index) => (
-              <View
-                key={`${skill}-${index}`}
-                style={[
-                  styles.skillChip,
-                  {
-                    backgroundColor: colors.chipBg,
-                    borderColor: colors.border,
-                    borderRadius: radius.full,
-                  },
-                ]}
-              >
-                <Text
+          <View style={[styles.skillsScrollWrapper, { borderColor: colors.border }]}>
+            <ScrollView
+              ref={skillsScrollRef}
+              style={styles.skillsScroll}
+              contentContainerStyle={styles.skillsContainer}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={true}
+              fadingEdgeLength={24}
+            >
+              {skills.map((skill, index) => (
+                <View
+                  key={`${skill}-${index}`}
                   style={[
-                    styles.skillText,
-                    { color: colors.text, fontSize: typography.sizes.sm },
+                    styles.skillChip,
+                    {
+                      backgroundColor: colors.chipBg,
+                      borderColor: colors.border,
+                      borderRadius: 999,
+                    },
                   ]}
                 >
-                  {skill}
-                </Text>
-                <TouchableOpacity
-                  onPress={() => handleRemoveSkill(skill)}
-                  style={styles.removeButton}
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  <Text
+                    style={[
+                      styles.skillText,
+                      { color: colors.text, fontSize: typography.sizes.sm },
+                    ]}
+                  >
+                    {skill}
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => handleRemoveSkill(skill)}
+                    style={styles.removeButton}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  >
+                    <Feather name="x" size={14} color={colors.textSecondary} />
+                  </TouchableOpacity>
+                </View>
+              ))}
+              {skills.length === 0 && (
+                <Text
+                  style={{
+                    color: colors.textSecondary,
+                    fontSize: typography.sizes.sm,
+                    fontStyle: 'italic',
+                    width: '100%',
+                    textAlign: 'center',
+                    marginTop: spacing(2),
+                  }}
                 >
-                  <Feather name="x" size={14} color={colors.textSecondary} />
-                </TouchableOpacity>
-              </View>
-            ))}
-            {skills.length === 0 && (
-              <Text
-                style={{
-                  color: colors.textSecondary,
-                  fontSize: typography.sizes.sm,
-                  fontStyle: 'italic',
-                  width: '100%',
-                  textAlign: 'center',
-                  marginTop: spacing(2),
-                }}
-              >
-                No skills added yet.
-              </Text>
-            )}
-          </ScrollView>
-
-          {/* Add Skill Input */}
-          <View style={[styles.inputContainer, { marginTop: spacing(3) }]}>
-            <TextInput
-              style={[
-                styles.input,
-                {
-                  backgroundColor: colors.card,
-                  color: colors.text,
-                  borderColor: colors.border,
-                  borderRadius: radius.md,
-                  paddingHorizontal: spacing(3),
-                  paddingVertical: spacing(2),
-                  fontSize: typography.sizes.md,
-                },
-              ]}
-              placeholder="Add a skill (e.g., React Native)"
-              placeholderTextColor={colors.textSecondary}
-              value={inputText}
-              onChangeText={setInputText}
-              onSubmitEditing={handleAddSkill}
-              returnKeyType="done"
-            />
-            <TouchableOpacity
-              onPress={handleAddSkill}
-              style={[
-                styles.addButton,
-                {
-                  backgroundColor: inputText.trim()
-                    ? colors.primary
-                    : colors.border,
-                  borderRadius: radius.md,
-                  marginLeft: spacing(2),
-                  paddingHorizontal: spacing(3),
-                },
-              ]}
-              disabled={!inputText.trim()}
-            >
-              <Feather
-                name="plus"
-                size={20}
-                color={inputText.trim() ? '#fff' : colors.textSecondary}
-              />
-            </TouchableOpacity>
+                  No has agregado habilidades aún.
+                </Text>
+              )}
+            </ScrollView>
           </View>
 
+          {/* Add Skill Input */}
+          <View style={{ zIndex: 10 }}>
+            <View style={[styles.inputContainer, { marginTop: spacing(3) }]}>
+              <TextInput
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: colors.card,
+                    color: colors.text,
+                    borderColor: colors.border,
+                    borderRadius: radius.md,
+                    paddingHorizontal: spacing(3),
+                    fontSize: typography.sizes.md,
+                  },
+                ]}
+                placeholder="Agregar habilidad..."
+                placeholderTextColor={colors.textSecondary}
+                value={inputText}
+                onChangeText={handleSearchSkills}
+                onSubmitEditing={() => handleAddSkill()}
+                returnKeyType="done"
+              />
+              <TouchableOpacity
+                onPress={() => handleAddSkill()}
+                style={[
+                  styles.addButton,
+                  { backgroundColor: colors.primary, marginLeft: spacing(2) },
+                ]}
+              >
+                {isSearching ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Feather name="plus" size={20} color="#fff" />
+                )}
+              </TouchableOpacity>
+            </View>
+
+            {/* Search Results Dropdown */}
+            {searchResults.length > 0 && (
+              <View
+                style={[
+                  styles.dropdown,
+                  { backgroundColor: colors.card, borderColor: colors.border },
+                ]}
+              >
+                <ScrollView keyboardShouldPersistTaps="handled" nestedScrollEnabled>
+                  {searchResults.map((item) => (
+                    <TouchableOpacity
+                      key={item.id}
+                      style={[styles.dropdownItem, { borderBottomColor: colors.border }]}
+                      onPress={() => handleAddSkill(item.name)}
+                    >
+                      <Text style={{ color: colors.text }}>{item.name}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
+          </View>
+
+          {/* Suggested Skills */}
+          {suggestedSkills.length > 0 && (
+            <View style={{ marginTop: spacing(3) }}>
+              <Text
+                style={[
+                  styles.suggestionsLabel,
+                  { color: colors.textSecondary, fontSize: typography.sizes.xs },
+                ]}
+              >
+                SUGERENCIAS
+              </Text>
+              <View style={styles.suggestionsContainer}>
+                {isLoadingSuggestions ? (
+                  <ActivityIndicator size="small" color={colors.primary} />
+                ) : (
+                  suggestedSkills.map((s) => (
+                    <TouchableOpacity
+                      key={s.id}
+                      onPress={() => handleAddSkill(s.name)}
+                      disabled={skills.includes(s.name)}
+                      style={[
+                        styles.suggestionChip,
+                        {
+                          borderColor: colors.border,
+                          borderRadius: 999,
+                          backgroundColor: colors.card,
+                        },
+                        skills.includes(s.name) && { opacity: 0.4 },
+                      ]}
+                    >
+                      <Text style={{ color: colors.textSecondary, fontSize: typography.sizes.xs }}>
+                        {s.name}
+                      </Text>
+                    </TouchableOpacity>
+                  ))
+                )}
+              </View>
+            </View>
+          )}
+
           {/* Actions */}
-          <View style={[styles.actions, { marginTop: spacing(4) }]}>
+          <View style={[styles.modalButtons, { marginTop: spacing(4) }]}>
             <TouchableOpacity
               onPress={onClose}
-              style={[
-                styles.button,
-                {
-                  backgroundColor: 'transparent',
-                  marginRight: spacing(2),
-                },
-              ]}
+              style={[styles.modalButton, { backgroundColor: colors.border }]}
             >
-              <Text
-                style={{
-                  color: colors.textSecondary,
-                  fontWeight: '600',
-                  fontSize: typography.sizes.md,
-                }}
-              >
-                Cancel
-              </Text>
+              <Text style={{ color: colors.text, fontWeight: '600' }}>Cancelar</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               onPress={handleSave}
-              style={[
-                styles.button,
-                {
-                  backgroundColor: colors.primary,
-                  borderRadius: radius.full,
-                  paddingHorizontal: spacing(4),
-                  paddingVertical: spacing(2),
-                  shadowColor: colors.primary,
-                  shadowOffset: { width: 0, height: 2 },
-                  shadowOpacity: 0.2,
-                  shadowRadius: 4,
-                  elevation: 2,
-                },
-              ]}
+              style={[styles.modalButton, { backgroundColor: colors.primary }]}
             >
-              <Text
-                style={{
-                  color: '#fff',
-                  fontWeight: '600',
-                  fontSize: typography.sizes.md,
-                }}
-              >
-                Save
-              </Text>
+              <Text style={{ color: '#fff', fontWeight: 'bold' }}>Guardar</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -260,28 +330,30 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     width: '100%',
-    maxHeight: '80%',
+    maxHeight: '85%',
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
+    shadowRadius: 12,
+    elevation: 8,
   },
   title: {
     fontWeight: 'bold',
     marginBottom: 16,
     textAlign: 'center',
   },
+  skillsScrollWrapper: {
+    borderWidth: 1,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
   skillsScroll: {
-    maxHeight: 200,
+    maxHeight: 160,
   },
   skillsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    paddingVertical: 8,
+    padding: 8,
   },
   skillChip: {
     flexDirection: 'row',
@@ -306,18 +378,50 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     borderWidth: 1,
+    height: 48,
   },
   addButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
-    height: '100%',
   },
-  actions: {
+  dropdown: {
+    borderWidth: 1,
+    borderRadius: 10,
+    marginTop: 4,
+    maxHeight: 140,
+    overflow: 'hidden',
+  },
+  dropdownItem: {
+    padding: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  suggestionsLabel: {
+    fontWeight: '600',
+    letterSpacing: 0.5,
+    marginBottom: 8,
+  },
+  suggestionsContainer: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
-    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
   },
-  button: {
+  suggestionChip: {
+    paddingVertical: 5,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  modalButton: {
+    flex: 1,
+    height: 48,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
   },

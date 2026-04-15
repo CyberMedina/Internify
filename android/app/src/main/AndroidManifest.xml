@@ -34,7 +34,7 @@
       </intent-filter>
       <intent-filter android:autoVerify="true" data-generated="true">
         <action android:name="android.intent.action.VIEW"/>
-        <data android:scheme="https" android:host="overfoul-domingo-unharmable.ngrok-free.dev" android:pathPrefix="/vacancies"/>
+        <data android:scheme="https" android:host="internify.institute" android:pathPrefix="/vacancies"/>
         <category android:name="android.intent.category.BROWSABLE"/>
         <category android:name="android.intent.category.DEFAULT"/>
       </intent-filter>

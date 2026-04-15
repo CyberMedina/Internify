@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, Animated, Image } from 'react-native';
+import { Text, Animated } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../theme/ThemeContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -10,7 +11,7 @@ import { getNotificationConsent, getNotificationConsentGranted } from '../utils/
 import * as Notifications from 'expo-notifications';
 
 export default function SplashScreen() {
-  const { colors, typography } = useTheme();
+  const { typography } = useTheme();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const { t } = useI18n();
@@ -73,17 +74,18 @@ export default function SplashScreen() {
   }, [isLoading, userToken, navigation]);
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.primary, paddingTop: insets.top, paddingBottom: insets.bottom, alignItems: 'center', justifyContent: 'center' }}>
+    <LinearGradient
+      colors={['#6B6EFF', '#3B44F6', '#3535D0']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={{ flex: 1, paddingTop: insets.top, paddingBottom: insets.bottom, alignItems: 'center', justifyContent: 'center' }}
+    >
       <StatusBar style="light" />
-      <Animated.View style={{ width: 88, height: 88, borderRadius: 44, backgroundColor: '#ffffff22', alignItems: 'center', justifyContent: 'center', transform: [{ scale }], opacity }}>
-        <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: '#ffffff33', alignItems: 'center', justifyContent: 'center' }}>
-          <Image 
-            source={require('../assets/images/InternificonMinimal.png')}
-            style={{ width: 40, height: 40 }}
-            resizeMode="contain"
-          />
-        </View>
-      </Animated.View>
+      <Animated.Image
+        source={require('../assets/images/InternifyV4NoLogo.png')}
+        style={{ width: 180, height: 180, transform: [{ scale }], opacity }}
+        resizeMode="contain"
+      />
       <Animated.Text
         style={{
           marginTop: 16,
@@ -96,6 +98,6 @@ export default function SplashScreen() {
       >
         {t('splash.title')}
       </Animated.Text>
-    </View>
+    </LinearGradient>
   );
 }

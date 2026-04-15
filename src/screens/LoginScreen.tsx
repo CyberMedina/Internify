@@ -261,7 +261,7 @@ export default function LoginScreen({ navigation }: Props) {
         <View style={styles.header}>
           {/* Logo Placeholder */}
           <Image
-            source={require('../assets/images/InternifyV3.png')}
+            source={require('../assets/images/InternifyV4.png')}
             style={{ width: 80, height: 80, marginBottom: 24, borderRadius: 24 }}
             resizeMode="contain"
           />

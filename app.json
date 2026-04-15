@@ -6,14 +6,16 @@
     "version": "1.0.0",
     "userInterfaceStyle": "automatic",
     "orientation": "portrait",
-    "icon": "./src/assets/images/Internifyv2.png",
+    "icon": "./src/assets/images/InternifyV4.png",
     "ios": {
-      "associatedDomains": ["applinks:overfoul-domingo-unharmable.ngrok-free.dev"]
+      "associatedDomains": [
+        "applinks:internify.institute"
+      ]
     },
     "splash": {
-      "image": "./src/assets/images/Internifyv2.png",
+      "image": "./src/assets/images/InternifyV4NoLogo.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#3B44F6"
     },
     "assetBundlePatterns": [
       "**/*"
@@ -24,15 +26,15 @@
       [
         "expo-notifications",
         {
-          "icon": "./src/assets/images/InternificonMinimal.png",
+          "icon": "./src/assets/images/InternifyV4NoLogo.png",
           "color": "#ffffff"
         }
       ]
     ],
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./src/assets/images/Internifyv2.png",
-        "backgroundColor": "#ffffff"
+        "foregroundImage": "./src/assets/images/InternifyV4NoLogo.png",
+        "backgroundColor": "#3D3DC8"
       },
       "intentFilters": [
         {
@@ -41,7 +43,7 @@
           "data": [
             {
               "scheme": "https",
-              "host": "overfoul-domingo-unharmable.ngrok-free.dev",
+              "host": "internify.institute",
               "pathPrefix": "/vacancies"
             }
           ],
@@ -55,7 +57,7 @@
       "googleServicesFile": "./google-services.json"
     },
     "web": {
-      "favicon": "./src/assets/images/Internifyv2.png"
+      "favicon": "./src/assets/images/InternifyV4.png"
     },
     "extra": {
       "eas": {

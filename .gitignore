@@ -18,5 +18,7 @@ node_modules/.cache/
 .DS_Store
 Thumbs.db
 
-google-services.json
+# Service account keys (keep private)
+internifyu-*.json
 internifyu-02de438d5c31.json
+internifyu-firebase-adminsdk-fbsvc-2ebeefc245.json

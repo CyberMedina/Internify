@@ -61,7 +61,7 @@ export default function OnboardingProcessScreen({ navigation }: Props) {
             <View style={styles.iconContainer}>
               {item.isIntro ? (
                 <Image 
-                  source={require('../../assets/images/InternifyNoLogo.png')} 
+                  source={require('../../assets/images/InternifyV4NoLogo.png')} 
                   style={{ width: normalize(32), height: normalize(32), tintColor: '#FFF' }} 
                   resizeMode="contain"
                 />

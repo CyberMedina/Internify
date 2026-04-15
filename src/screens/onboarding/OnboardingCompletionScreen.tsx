@@ -72,7 +72,7 @@ export default function OnboardingCompletionScreen({ navigation }: Props) {
            <Animated.View style={rocketStyle}>
              <View style={styles.iconCircle}>
                 <Image 
-                  source={require('../../assets/images/InternifyV3.png')} 
+                  source={require('../../assets/images/InternifyV4.png')} 
                   style={{ width: 180, height: 180, borderRadius: 90 }} 
                   resizeMode="cover"
                 />

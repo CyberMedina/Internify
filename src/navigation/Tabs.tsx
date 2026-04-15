@@ -141,7 +141,7 @@ export default function Tabs() {
         options={({ route }) => {
           // Hide tab bar on ApplicationStatus screen
           const routeName = getFocusedRouteNameFromRoute(route) ?? 'MyApplications';
-          const hideTab = routeName === 'ApplicationStatus';
+          const hideTab = routeName === 'ApplicationStatus' || routeName === 'JobDetail';
           
           return {
             title: t('applications.title'), // Postulaciones

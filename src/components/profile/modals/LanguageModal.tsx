@@ -18,6 +18,11 @@ interface LanguageModalProps {
 
 const LANGUAGE_LEVELS = ['Básico', 'Intermedio', 'Avanzado', 'Nativo'];
 
+const COMMON_LANGUAGES = [
+  "Español", "Inglés", "Francés", "Alemán", "Italiano", "Portugués",
+  "Chino Mandarín", "Japonés", "Coreano", "Ruso", "Árabe", "Hindi", "Holandés"
+];
+
 export default function LanguageModal({ visible, onClose, onSave, initialData }: LanguageModalProps) {
   const { colors, spacing } = useTheme();
   
@@ -27,6 +32,8 @@ export default function LanguageModal({ visible, onClose, onSave, initialData }:
   });
   
   const [errors, setErrors] = useState<any>({});
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
 
   useEffect(() => {
     if (visible) {
@@ -38,15 +45,33 @@ export default function LanguageModal({ visible, onClose, onSave, initialData }:
           level: initialData.level || 'Básico'
         });
       } else {
-        // Reset
-        setData({
-          language: '',
-          level: 'Básico'
-        });
+        setData({ language: '', level: 'Básico' });
       }
       setErrors({});
+      setSuggestions([]);
+      setShowSuggestions(false);
     }
   }, [visible, initialData]);
+
+  const handleLanguageChange = (text: string) => {
+    setData({ ...data, language: text });
+    if (text.length > 0) {
+      const filtered = COMMON_LANGUAGES.filter(lang =>
+        lang.toLowerCase().includes(text.toLowerCase()) && lang.toLowerCase() !== text.toLowerCase()
+      );
+      setSuggestions(filtered);
+      setShowSuggestions(filtered.length > 0);
+    } else {
+      setSuggestions([]);
+      setShowSuggestions(false);
+    }
+  };
+
+  const selectSuggestion = (lang: string) => {
+    setData({ ...data, language: lang });
+    setSuggestions([]);
+    setShowSuggestions(false);
+  };
 
   const handleSave = () => {
     const newErrors: any = {};
@@ -76,8 +101,8 @@ export default function LanguageModal({ visible, onClose, onSave, initialData }:
             {initialData ? 'Editar Idioma' : 'Nuevo Idioma'}
           </Text>
           
-          <ScrollView showsVerticalScrollIndicator={false}>
-            <View style={{ marginBottom: 12 }}>
+          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+            <View style={{ marginBottom: 12, zIndex: 10 }}>
                 <Text style={[styles.label, { color: colors.textSecondary }]}>Idioma</Text>
                 <TextInput
                     style={[
@@ -91,9 +116,23 @@ export default function LanguageModal({ visible, onClose, onSave, initialData }:
                     placeholder="Ej. Inglés, Francés..."
                     placeholderTextColor={colors.textSecondary}
                     value={data.language}
-                    onChangeText={(text) => setData({...data, language: text})}
+                    onChangeText={handleLanguageChange}
                 />
                 {errors.language && <Text style={[styles.errorText, { color: colors.error }]}>{errors.language}</Text>}
+
+                {showSuggestions && (
+                    <View style={[styles.suggestionsDropdown, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                        {suggestions.map((lang) => (
+                            <TouchableOpacity
+                                key={lang}
+                                style={[styles.suggestionItem, { borderBottomColor: colors.border }]}
+                                onPress={() => selectSuggestion(lang)}
+                            >
+                                <Text style={{ color: colors.text }}>{lang}</Text>
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+                )}
             </View>
 
             <View style={{ marginBottom: 24 }}>
@@ -171,6 +210,16 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 4,
     marginLeft: 4,
+  },
+  suggestionsDropdown: {
+    borderWidth: 1,
+    borderRadius: 10,
+    marginTop: 4,
+    overflow: 'hidden',
+  },
+  suggestionItem: {
+    padding: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
   chipContainer: {
     flexDirection: 'row',

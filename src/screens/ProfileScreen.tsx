@@ -150,7 +150,9 @@ export default function ProfileScreen() {
 
       <ScreenContainer scroll contentContainerStyle={{ paddingBottom: spacing(4) }}>
         {/* Top user card */}
-        <View
+        <TouchableOpacity
+          activeOpacity={0.85}
+          onPress={() => (navigation as any).navigate('MyProfile')}
           style={{
             marginHorizontal: spacing(2),
             backgroundColor: colors.primary,
@@ -175,12 +177,7 @@ export default function ProfileScreen() {
           <View style={{ flex: 1 }}>
             <Text style={{ color: '#fff', fontWeight: '700', fontSize: typography.sizes.lg }}>{displayName}</Text>
             <Text style={{ color: '#E0E7FF', marginTop: 2, fontSize: typography.sizes.sm }}>{status.stage}</Text>
-            <TouchableOpacity 
-              style={{ marginTop: 4 }}
-              onPress={() => (navigation as any).navigate('MyProfile')}
-            >
-              <Text style={{ color: '#fff', fontWeight: '600', fontSize: typography.sizes.sm }}>{t('profile.viewProfile')} ›</Text>
-            </TouchableOpacity>
+            <Text style={{ color: '#fff', fontWeight: '600', fontSize: typography.sizes.sm, marginTop: 4 }}>{t('profile.viewProfile')} ›</Text>
           </View>
 
           {/* Porcentaje numérico */}
@@ -197,7 +194,7 @@ export default function ProfileScreen() {
               {currentHours} / {status.nextGoal}h
             </Text>
           </View>
-        </View>
+        </TouchableOpacity>
 
         {/* Menu list (single continuous block) */}
         <View style={{ marginTop: spacing(2), backgroundColor: colors.surface }}>
