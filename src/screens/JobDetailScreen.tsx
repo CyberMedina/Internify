@@ -2,8 +2,13 @@ import React from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator, Modal, StyleSheet, Image, Share, Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
-import SocialShare from 'react-native-share';
-import { getColors } from 'react-native-image-colors';
+let SocialShare: any = null;
+let getColors: any = null;
+
+if (Platform.OS !== 'web') {
+  SocialShare = require('react-native-share').default;
+  getColors = require('react-native-image-colors').getColors;
+}
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../theme/ThemeContext';
 import { Feather, FontAwesome5 } from '@expo/vector-icons';
@@ -22,7 +27,7 @@ import { useSaved } from '../context/SavedContext';
 import { useApplications } from '../context/ApplicationsContext';
 import JobDetailSkeleton from './JobDetailSkeleton';
 import { getInitials } from '../utils/stringUtils';
-import { adjustColorForDarkMode } from '../utils/colorUtils';
+import { adjustColorForDarkMode, extractDominantColor } from '../utils/colorUtils';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { addRecentlyViewed } from '../utils/storage';
 import GradientButton from '../components/GradientButton';
@@ -111,20 +116,9 @@ export default function JobDetailScreen() {
     const fetchColors = async () => {
       if (logo) {
         try {
-          const result = await getColors(logo, {
-            fallback: '#E6232C',
-            cache: true,
-            key: logo,
-          });
-
+          const extracted = await extractDominantColor(logo, '#E6232C');
           if (cancelled) return;
-          if (Platform.OS === 'android') {
-            // @ts-ignore
-            setRawDominantColor(result.dominant || result.vibrant || '#E6232C');
-          } else {
-            // @ts-ignore
-            setRawDominantColor(result.primary || '#E6232C');
-          }
+          setRawDominantColor(extracted);
         } catch (e) {
           if (cancelled) return;
           console.log('Error extracting colors', e);
@@ -225,13 +219,21 @@ export default function JobDetailScreen() {
         // Compartir la imagen descargada usando react-native-share
         // Esto permite compartir imagen + texto en ambas plataformas (especialmente útil para WhatsApp en Android)
         try {
-          await SocialShare.open({
-            title: `Compartir vacante: ${data.title}`,
-            message: message,
-            url: uri,
-            type: 'image/png',
-            failOnCancel: false, // No lanzar error si el usuario cancela
-          });
+          if (Platform.OS !== 'web' && SocialShare) {
+            await SocialShare.open({
+              title: `Compartir vacante: ${data.title}`,
+              message: message,
+              url: uri,
+              type: 'image/png',
+              failOnCancel: false, // No lanzar error si el usuario cancela
+            });
+          } else {
+             // Fallback para web
+             await Share.share({
+               message,
+               title: `Vacante: ${data.title}`
+             });
+          }
         } catch (shareError) {
           console.log('SocialShare error or cancelled:', shareError);
           // Si falla react-native-share, intentamos con los métodos nativos/expo como fallback

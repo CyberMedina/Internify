@@ -84,7 +84,12 @@ export default function HomeScreen() {
   const [isCategoryLoading, setIsCategoryLoading] = useState(false);
 
   // Debounce search
+  const isSearchFirstRender = useRef(true);
   useEffect(() => {
+    if (isSearchFirstRender.current) {
+      isSearchFirstRender.current = false;
+      return;
+    }
     const timer = setTimeout(() => {
       setPage(1);
       fetchRecent(1, searchText, activeCatId);

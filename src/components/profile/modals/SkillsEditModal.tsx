@@ -10,6 +10,8 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  TouchableWithoutFeedback,
+  Keyboard
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useTheme } from '../../../theme/ThemeContext';
@@ -111,11 +113,9 @@ export const SkillsEditModal: React.FC<SkillsEditModalProps> = ({
         style={styles.modalOverlay}
       >
         <View style={styles.backdrop}>
-          <TouchableOpacity
-            style={StyleSheet.absoluteFill}
-            onPress={onClose}
-            activeOpacity={1}
-          />
+          <TouchableWithoutFeedback onPress={() => { Keyboard.dismiss(); onClose(); }}>
+            <View style={StyleSheet.absoluteFill} />
+          </TouchableWithoutFeedback>
         </View>
 
         <View

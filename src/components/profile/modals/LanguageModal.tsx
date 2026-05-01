@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, TextInput, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, StyleSheet, Modal, TouchableOpacity, TextInput, ScrollView, KeyboardAvoidingView, Platform, Keyboard , TouchableWithoutFeedback } from 'react-native';
 import { useTheme } from '../../../theme/ThemeContext';
 import Chip from '../../Chip';
 
@@ -96,12 +96,20 @@ export default function LanguageModal({ visible, onClose, onSave, initialData }:
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.modalOverlay}
       >
-        <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+        <TouchableWithoutFeedback onPress={() => { Keyboard.dismiss(); onClose(); }}>
+          <View style={StyleSheet.absoluteFill} />
+        </TouchableWithoutFeedback>
+        <View style={[styles.modalContent, { backgroundColor: colors.card, maxHeight: '90%', flexShrink: 1, width: '100%' }]}>
           <Text style={[styles.modalTitle, { color: colors.text }]}>
             {initialData ? 'Editar Idioma' : 'Nuevo Idioma'}
           </Text>
           
-          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+          <ScrollView 
+            style={{ flexShrink: 1 }}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="always"
+            contentContainerStyle={{ flexGrow: 1 }}
+          >
             <View style={{ marginBottom: 12, zIndex: 10 }}>
                 <Text style={[styles.label, { color: colors.textSecondary }]}>Idioma</Text>
                 <TextInput

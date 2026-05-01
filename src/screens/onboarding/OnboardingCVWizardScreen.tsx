@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, KeyboardAvoidingView, Platform, Modal, Switch, Alert, BackHandler } from 'react-native';
 import { FontAwesome5, MaterialIcons, Ionicons } from '@expo/vector-icons';
 import Animated, { FadeInRight, FadeOutLeft, Layout, FadeInDown, FadeOut } from 'react-native-reanimated';
-import * as Clipboard from 'expo-clipboard';
+
 import ScreenContainer from '../../components/ScreenContainer';
 import OnboardingHeader from '../../components/OnboardingHeader';
 import { useTheme } from '../../theme/ThemeContext';
@@ -100,9 +100,7 @@ export default function OnboardingCVWizardScreen({ navigation, route }: Props) {
   const [newCert, setNewCert] = useState({ name: '', organization: '', startMonth: '', startYear: '', endMonth: '', endYear: '' });
   const [certErrors, setCertErrors] = useState<any>({});
 
-  // JSON Debug Modal State
-  const [jsonModalVisible, setJsonModalVisible] = useState(false);
-  const [finalJson, setFinalJson] = useState('');
+
 
   // AI Pre-fill
   useEffect(() => {
@@ -318,7 +316,6 @@ export default function OnboardingCVWizardScreen({ navigation, route }: Props) {
           startYear: secondaryStartYear,
           endMonth: secondaryEndMonth,
           endYear: secondaryEndYear,
-          // ISO Dates for Education
           startDateISO: (secondaryStartMonth && secondaryStartYear) ? new Date(parseInt(secondaryStartYear), parseInt(secondaryStartMonth) - 1, 1).toISOString() : null,
           endDateISO: (secondaryEndMonth && secondaryEndYear) ? new Date(parseInt(secondaryEndYear), parseInt(secondaryEndMonth) - 1, 1).toISOString() : null
         },
@@ -332,21 +329,10 @@ export default function OnboardingCVWizardScreen({ navigation, route }: Props) {
       // Save data to mock user
       currentUser.cvProfile = cvData;
 
-      // Show JSON for debugging/backend implementation
-      setFinalJson(JSON.stringify(cvData, null, 2));
-      setJsonModalVisible(true);
+      navigation.navigate('CVPreview');
     }
   };
 
-  const handleFinalize = () => {
-    setJsonModalVisible(false);
-    navigation.navigate('CVPreview');
-  };
-
-  const handleCopyJson = async () => {
-    await Clipboard.setStringAsync(finalJson);
-    Alert.alert('Copiado', 'El JSON ha sido copiado al portapapeles.');
-  };
 
   const handleSaveExperience = (experienceData: Experience) => {
     
@@ -1163,44 +1149,6 @@ export default function OnboardingCVWizardScreen({ navigation, route }: Props) {
     </Modal>
   );
 
-  const renderJsonModal = () => (
-    <Modal
-      animationType="fade"
-      transparent={true}
-      visible={jsonModalVisible}
-      onRequestClose={handleFinalize}
-    >
-      <View style={styles.modalOverlay}>
-        <View style={[styles.modalContent, { backgroundColor: colors.card, height: '80%' }]}>
-          <Text style={[styles.modalTitle, { color: colors.text }]}>JSON Generado</Text>
-          <Text style={{ color: colors.textSecondary, marginBottom: 12 }}>
-            Esta es la estructura de datos para tu backend:
-          </Text>
-          
-          <ScrollView style={[styles.jsonContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <Text style={{ fontFamily: 'monospace', color: colors.text }}>{finalJson}</Text>
-          </ScrollView>
-
-          <View style={{ flexDirection: 'row', gap: 12 }}>
-            <TouchableOpacity 
-              style={[styles.button, { backgroundColor: colors.border, flex: 1, marginTop: 16 }]} 
-              onPress={handleCopyJson}
-            >
-              <FontAwesome5 name="copy" size={16} color={colors.text} style={{ marginRight: 8 }} />
-              <Text style={[styles.buttonText, { color: colors.text }]}>Copiar</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={[styles.button, { backgroundColor: colors.primary, flex: 1, marginTop: 16 }]} 
-              onPress={handleFinalize}
-            >
-              <Text style={[styles.buttonText, { color: '#FFF' }]}>Continuar</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-    </Modal>
-  );
 
   return (
     <ScreenContainer safeTop safeBottom style={styles.container}>
@@ -1219,7 +1167,7 @@ export default function OnboardingCVWizardScreen({ navigation, route }: Props) {
       {renderLanguageModal()}
       {renderTitleModal()}
       {renderValidationModal()}
-      {renderJsonModal()}
+
       <KeyboardAvoidingView 
         behavior={Platform.OS === 'ios' ? 'padding' : undefined} 
         style={{ flex: 1 }}
@@ -1525,13 +1473,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  jsonContainer: {
-    flex: 1,
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 16,
-  },
+
   errorText: {
     color: 'red',
     fontSize: 12,

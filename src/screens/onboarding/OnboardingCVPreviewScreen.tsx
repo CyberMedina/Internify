@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Alert, Image } from 'react-native';
-import { FontAwesome5, MaterialCommunityIcons } from '@expo/vector-icons';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Image } from 'react-native';
+import { FontAwesome5, Ionicons } from '@expo/vector-icons';
 import ScreenContainer from '../../components/ScreenContainer';
 import OnboardingHeader from '../../components/OnboardingHeader';
 import { api } from '../../services/api';
@@ -16,35 +16,26 @@ type Props = NativeStackScreenProps<OnboardingStackParamList, 'CVPreview'>;
 export default function OnboardingCVPreviewScreen({ navigation }: Props) {
   const { colors, typography, spacing } = useTheme();
   const { cvProfile } = currentUser;
-  const { userToken } = useAuth();
+  const { userToken, studentProfile, fetchStudentProfile } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [profileData, setProfileData] = useState<any>(null);
-  const [isLoadingProfile, setIsLoadingProfile] = useState(true);
+  const [isLoadingProfile, setIsLoadingProfile] = useState(false);
 
+  // Fetch profile if not already loaded in context
   useEffect(() => {
-    const fetchProfile = async () => {
-      try {
-        if (userToken) {
-          const response = await api.get<any>('/student/profile', { token: userToken });
-          setProfileData(response);
-        }
-      } catch (error) {
-        console.error('Error fetching profile:', error);
-      } finally {
-        setIsLoadingProfile(false);
-      }
-    };
+    if (!studentProfile && userToken) {
+      setIsLoadingProfile(true);
+      fetchStudentProfile().finally(() => setIsLoadingProfile(false));
+    }
+  }, []);
 
-    fetchProfile();
-  }, [userToken]);
-
-  const displayNames = profileData?.profile?.first_name || currentUser.names;
-  const displayLastnames = profileData?.profile?.last_name || currentUser.lastnames;
-  const displayCareer = profileData?.academic_info?.career || currentUser.career;
-  const displayEmail = profileData?.email || currentUser.email;
-  const displayPhone = profileData?.profile?.phone || currentUser.phone;
-  const displayFaculty = profileData?.academic_info?.department || currentUser.faculty;
-  const displayPhoto = profileData?.profile?.photo;
+  // Use studentProfile from AuthContext (already fetched from /student/profile)
+  const displayNames = studentProfile?.profile?.first_name ?? '';
+  const displayLastnames = studentProfile?.profile?.last_name ?? '';
+  const displayCareer = studentProfile?.academic_info?.career ?? '';
+  const displayEmail = studentProfile?.email ?? '';
+  const displayPhone = studentProfile?.profile?.phone ?? '';
+  const displayFaculty = studentProfile?.academic_info?.department ?? '';
+  const displayPhoto = studentProfile?.profile?.photo ?? null;
 
   const handleFinish = async () => {
     setIsSubmitting(true);
@@ -112,21 +103,7 @@ export default function OnboardingCVPreviewScreen({ navigation }: Props) {
       (currentUser as any).isProfileComplete = true;
       (currentUser as any).profileProgress = 100;
 
-      Alert.alert(
-        "¡Perfil Creado!",
-        "Tu CV ha sido guardado exitosamente.",
-        [
-          { 
-            text: "Continuar", 
-            onPress: () => {
-              navigation.getParent()?.reset({
-                index: 0,
-                routes: [{ name: 'MainTabs' }],
-              });
-            }
-          }
-        ]
-      );
+      navigation.navigate('CVSuccess');
 
     } catch (error: any) {
       console.error('❌ ERROR AL GUARDAR CV:', error);
@@ -170,6 +147,16 @@ export default function OnboardingCVPreviewScreen({ navigation }: Props) {
 
   return (
     <ScreenContainer safeTop safeBottom style={styles.container}>
+      {/* Top bar with back button */}
+      <View style={styles.topBar}>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={[styles.backButton, { backgroundColor: colors.surface }]}
+        >
+          <Ionicons name="arrow-back" size={20} color={colors.text} />
+        </TouchableOpacity>
+      </View>
+
       <OnboardingHeader 
         icon="eye" 
         title="Vista Previa" 
@@ -179,23 +166,29 @@ export default function OnboardingCVPreviewScreen({ navigation }: Props) {
       <ScrollView contentContainerStyle={styles.content}>
         {/* Header Card */}
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <View style={styles.profileHeader}>
-            {displayPhoto ? (
-              <Image 
-                source={{ uri: displayPhoto }} 
-                style={[styles.avatarPlaceholder, { backgroundColor: colors.surface }]} 
-              />
-            ) : (
-              <View style={[styles.avatarPlaceholder, { backgroundColor: colors.primary }]}>
-                <Text style={{ color: '#FFF', fontSize: 24, fontWeight: 'bold' }}>{displayNames.charAt(0)}</Text>
+          {isLoadingProfile ? (
+            <ActivityIndicator size="small" color={colors.primary} style={{ paddingVertical: 16 }} />
+          ) : (
+            <View style={styles.profileHeader}>
+              {displayPhoto ? (
+                <Image 
+                  source={{ uri: displayPhoto }} 
+                  style={[styles.avatarPlaceholder, { backgroundColor: colors.surface }]} 
+                />
+              ) : (
+                <View style={[styles.avatarPlaceholder, { backgroundColor: colors.primary }]}>
+                  <Text style={{ color: '#FFF', fontSize: 24, fontWeight: 'bold' }}>
+                    {displayNames.charAt(0) || '?'}
+                  </Text>
+                </View>
+              )}
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.name, { color: colors.text }]}>{`${displayNames} ${displayLastnames}`}</Text>
+                <Text style={[styles.career, { color: colors.textSecondary }]}>{displayCareer}</Text>
+                <Text style={[styles.contact, { color: colors.textSecondary }]}>{displayEmail} • {displayPhone}</Text>
               </View>
-            )}
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.name, { color: colors.text }]}>{`${displayNames} ${displayLastnames}`}</Text>
-              <Text style={[styles.career, { color: colors.textSecondary }]}>{displayCareer}</Text>
-              <Text style={[styles.contact, { color: colors.textSecondary }]}>{displayEmail} • {displayPhone}</Text>
             </View>
-          </View>
+          )}
         </View>
 
         {/* Summary */}
@@ -291,7 +284,7 @@ export default function OnboardingCVPreviewScreen({ navigation }: Props) {
       <View style={[styles.footer, { backgroundColor: colors.card, borderTopColor: colors.border }]}>
         <GradientButton
           onPress={handleFinish}
-          title="Finalizar y Guardar Perfil"
+          title="Finalizar"
           loading={isSubmitting}
           icon={<FontAwesome5 name="check" size={16} color="#FFF" />}
           iconPosition="right"
@@ -314,6 +307,18 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     marginBottom: 16,
+  },
+  topBar: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 4,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   content: {
     padding: 24,

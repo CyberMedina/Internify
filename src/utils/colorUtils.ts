@@ -1,5 +1,13 @@
-import { getColors } from 'react-native-image-colors';
 import { Platform } from 'react-native';
+
+let getColors: any = null;
+if (Platform.OS !== 'web') {
+  try {
+    getColors = require('react-native-image-colors').getColors;
+  } catch (e) {
+    console.log('Error loading react-native-image-colors', e);
+  }
+}
 
 function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
   const shorthand = /^#?([a-f\d])([a-f\d])([a-f\d])$/i;
@@ -36,6 +44,14 @@ export function getLuminance(hex: string): number {
   return a[0] * 0.2126 + a[1] * 0.7152 + a[2] * 0.0722;
 }
 
+export function getSaturation(hex: string): number {
+  const rgb = hexToRgb(hex);
+  if (!rgb) return 0;
+  const max = Math.max(rgb.r, rgb.g, rgb.b);
+  const min = Math.min(rgb.r, rgb.g, rgb.b);
+  return max === 0 ? 0 : (max - min) / max;
+}
+
 /** Ajusta un color para que sea visible sobre fondos oscuros */
 export function adjustColorForDarkMode(hex: string): string {
   const luminance = getLuminance(hex);
@@ -46,7 +62,7 @@ export function adjustColorForDarkMode(hex: string): string {
 }
 
 export const extractDominantColor = async (imageUrl: string | undefined | null, fallback: string) => {
-  if (!imageUrl || !imageUrl.startsWith('http')) return fallback;
+  if (!imageUrl || !getColors) return fallback;
   
   try {
     const result = await getColors(imageUrl, {
@@ -59,8 +75,43 @@ export const extractDominantColor = async (imageUrl: string | undefined | null, 
         // @ts-ignore
         return result.dominant || result.vibrant || fallback;
     } else {
+        // En iOS, la API extrae paletas de contraste (a menudo oscuras). 
+        // Vamos a evaluar la "vibrancia" de cada color disponible y elegir el más llamativo.
         // @ts-ignore
-        return result.primary || fallback;
+        const candidates = [result.detail, result.primary, result.secondary, result.background];
+        let bestColor = null;
+        let maxVibrancy = -1;
+
+        for (const color of candidates) {
+            if (!color) continue;
+            
+            // Calculamos Saturación y Brillo (Value en HSV)
+            // @ts-ignore (porque usamos hexToRgb interna, que puede fallar con strings raros)
+            const rgb = hexToRgb(color);
+            if (!rgb) continue;
+
+            const max = Math.max(rgb.r, rgb.g, rgb.b);
+            const min = Math.min(rgb.r, rgb.g, rgb.b);
+            const saturation = max === 0 ? 0 : (max - min) / max;
+            const value = max / 255;
+            
+            // Multiplicamos para obtener un score de "Vibrancia": colores puros y brillantes ganan
+            const vibrancy = saturation * value;
+
+            if (vibrancy > maxVibrancy) {
+                maxVibrancy = vibrancy;
+                bestColor = color;
+            }
+        }
+
+        // Si encontramos un color medianamente vibrante, lo usamos
+        if (bestColor && maxVibrancy > 0.15) {
+            return bestColor;
+        }
+
+        // De lo contrario, iOS no sacó ningún color vivo. Retornamos primary, background o fallback.
+        // @ts-ignore
+        return result.primary || result.background || fallback;
     }
   } catch (e) {
     console.log('Error extracting colors', e);

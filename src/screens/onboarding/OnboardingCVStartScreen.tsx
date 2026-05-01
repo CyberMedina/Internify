@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, ScrollView } from 'react-native';
 import { FontAwesome5, MaterialCommunityIcons, Feather } from '@expo/vector-icons';
 import Animated, { FadeInDown, FadeOut } from 'react-native-reanimated';
 import * as DocumentPicker from 'expo-document-picker';
@@ -89,16 +89,17 @@ export default function OnboardingCVStartScreen({ navigation }: Props) {
             backgroundColor: colors.surface, 
             alignItems: 'center', 
             justifyContent: 'center',
-            // Add shadow to match if needed, but NotificationsScreen doesn't seem to have explicit shadow on the button itself, just bg color.
-            // However, if the background is white/surface, it might need shadow if on white bg.
-            // NotificationsScreen uses colors.surface.
           }}
         >
           <Feather name="arrow-left" size={18} color={colors.text} />
         </TouchableOpacity>
       </View>
 
-      <View style={styles.content}>
+      <ScrollView 
+        style={{ flex: 1 }} 
+        contentContainerStyle={{ padding: 24, paddingTop: 40, paddingBottom: 40 }}
+        showsVerticalScrollIndicator={false}
+      >
         <OnboardingHeader 
           icon="file-alt" 
           title="Construyamos tu perfil" 
@@ -162,7 +163,7 @@ export default function OnboardingCVStartScreen({ navigation }: Props) {
             </View>
           </TouchableOpacity>
         </View>
-      </View>
+      </ScrollView>
     </ScreenContainer>
   );
 }

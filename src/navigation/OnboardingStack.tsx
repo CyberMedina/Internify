@@ -7,6 +7,7 @@ import OnboardingAcademicScreen from '../screens/onboarding/OnboardingAcademicSc
 import OnboardingCVStartScreen from '../screens/onboarding/OnboardingCVStartScreen';
 import OnboardingCVWizardScreen from '../screens/onboarding/OnboardingCVWizardScreen';
 import OnboardingCVPreviewScreen from '../screens/onboarding/OnboardingCVPreviewScreen';
+import OnboardingCVSuccessScreen from '../screens/onboarding/OnboardingCVSuccessScreen';
 import OnboardingRenewalScreen from '../screens/onboarding/OnboardingRenewalScreen';
 import OnboardingProcessScreen from '../screens/onboarding/OnboardingProcessScreen';
 import OnboardingCompletionScreen from '../screens/onboarding/OnboardingCompletionScreen';
@@ -48,6 +49,7 @@ export type OnboardingStackParamList = {
     };
   };
   CVPreview: undefined;
+  CVSuccess: undefined;
 };
 
 const Stack = createNativeStackNavigator<OnboardingStackParamList>();
@@ -64,6 +66,7 @@ export default function OnboardingStack() {
       <Stack.Screen name="CVStart" component={OnboardingCVStartScreen} />
       <Stack.Screen name="CVWizard" component={OnboardingCVWizardScreen} />
       <Stack.Screen name="CVPreview" component={OnboardingCVPreviewScreen} />
+      <Stack.Screen name="CVSuccess" component={OnboardingCVSuccessScreen} />
     </Stack.Navigator>
   );
 }

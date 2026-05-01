@@ -9,8 +9,13 @@
     "icon": "./src/assets/images/InternifyV4.png",
     "ios": {
       "associatedDomains": [
+        "applinks:internify.institute",
         "applinks:internify.institute"
-      ]
+      ],
+      "bundleIdentifier": "com.uni.internify",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "splash": {
       "image": "./src/assets/images/InternifyV4NoLogo.png",
