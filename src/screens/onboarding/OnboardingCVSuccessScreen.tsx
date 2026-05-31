@@ -121,12 +121,14 @@ export default function OnboardingCVSuccessScreen({ navigation }: Props) {
           </Animated.View>
 
           {/* Main icon */}
-          <Animated.View entering={ZoomIn.delay(200).springify()} style={floatStyle}>
-            <View style={[styles.iconCircle, { backgroundColor: colors.primary + '18', borderColor: colors.primary + '40' }]}>
-              <View style={[styles.iconInner, { backgroundColor: colors.primary }]}>
-                <FontAwesome5 name="check" size={44} color="#FFF" />
+          <Animated.View entering={ZoomIn.delay(200).springify()}>
+            <Animated.View style={floatStyle}>
+              <View style={[styles.iconCircle, { backgroundColor: colors.primary + '18', borderColor: colors.primary + '40' }]}>
+                <View style={[styles.iconInner, { backgroundColor: colors.primary }]}>
+                  <FontAwesome5 name="check" size={44} color="#FFF" />
+                </View>
               </View>
-            </View>
+            </Animated.View>
           </Animated.View>
         </View>
 

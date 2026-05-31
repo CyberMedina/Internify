@@ -18,6 +18,10 @@ import { navigationRef } from 'src/navigation/navigationRef';
 import * as Linking from 'expo-linking';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { ENV } from './src/config/env';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+
+// Create a client
+const queryClient = new QueryClient();
 
 // Configuración de notificaciones en primer plano: Silenciar alerta visual (banner) y sonido
 Notifications.setNotificationHandler({
@@ -206,25 +210,27 @@ function Root() {
 export default function App() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-    <SafeAreaProvider>
-      <ErrorBoundary>
-        <ThemeProvider>
-          <I18nProvider>
-            <ToastProvider>
-              <AuthProvider>
-                <ApplicationsProvider>
-                  <SavedProvider>
-                    <VacancyProvider>
-                      <Root />
-                    </VacancyProvider>
-                  </SavedProvider>
-                </ApplicationsProvider>
-              </AuthProvider>
-            </ToastProvider>
-          </I18nProvider>
-        </ThemeProvider>
-      </ErrorBoundary>
-    </SafeAreaProvider>
+    <QueryClientProvider client={queryClient}>
+      <SafeAreaProvider>
+        <ErrorBoundary>
+          <ThemeProvider>
+            <I18nProvider>
+              <ToastProvider>
+                <AuthProvider>
+                  <ApplicationsProvider>
+                    <SavedProvider>
+                      <VacancyProvider>
+                        <Root />
+                      </VacancyProvider>
+                    </SavedProvider>
+                  </ApplicationsProvider>
+                </AuthProvider>
+              </ToastProvider>
+            </I18nProvider>
+          </ThemeProvider>
+        </ErrorBoundary>
+      </SafeAreaProvider>
+    </QueryClientProvider>
     </GestureHandlerRootView>
   );
 }

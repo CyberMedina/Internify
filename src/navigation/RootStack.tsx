@@ -10,6 +10,7 @@ import JobDetailScreen from '../screens/JobDetailScreen';
 import NotificationConsentScreen from 'src/screens/NotificationConsentScreen';
 
 import ApplicationStatusScreen from 'src/screens/ApplicationStatusScreen';
+import ApplicationSuccessScreen from 'src/screens/ApplicationSuccessScreen';
 import { Application } from 'src/types/vacancy';
 
 export type RootStackParamList = {
@@ -20,6 +21,7 @@ export type RootStackParamList = {
   MainTabs: undefined;
   JobDetail: { job?: any; id?: string; hideActions?: boolean } | undefined;
   ApplicationStatus: { application: Application; from?: string };
+  ApplicationSuccess: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -34,6 +36,7 @@ export default function RootStack() {
       <Stack.Screen name="MainTabs" component={Tabs} />
       <Stack.Screen name="JobDetail" component={JobDetailScreen} />
       <Stack.Screen name="ApplicationStatus" component={ApplicationStatusScreen} />
+      <Stack.Screen name="ApplicationSuccess" component={ApplicationSuccessScreen} />
     </Stack.Navigator>
   );
 }

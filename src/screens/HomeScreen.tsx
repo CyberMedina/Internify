@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState, useMemo, useRef } from 'react';
-import { View, Text, ScrollView, TextInput, TouchableOpacity, ActivityIndicator, Platform, LayoutAnimation, UIManager, DeviceEventEmitter, useWindowDimensions } from 'react-native';
+import { View, Text, ScrollView, TextInput, TouchableOpacity, ActivityIndicator, Platform, LayoutAnimation, UIManager, DeviceEventEmitter, useWindowDimensions, RefreshControl } from 'react-native';
 import { useNavigation, useScrollToTop } from '@react-navigation/native';
 import { useTheme } from '../theme/ThemeContext';
 import { Feather } from '@expo/vector-icons';
@@ -410,6 +410,11 @@ export default function HomeScreen() {
   
   const scrollY = useSharedValue(0);
   const expandY = useSharedValue(AVATAR_SECTION_HEIGHT);
+  const isRefreshingSync = useSharedValue(false);
+
+  useEffect(() => {
+    isRefreshingSync.value = refreshing;
+  }, [refreshing]);
 
   const scrollHandler = useAnimatedScrollHandler({
     onScroll: (event, ctx: { prevY?: number }) => {
@@ -458,6 +463,18 @@ export default function HomeScreen() {
     return {
       borderBottomLeftRadius: borderRadius,
       borderBottomRightRadius: borderRadius,
+    };
+  });
+
+  const customLoaderAnimatedStyle = useAnimatedStyle(() => {
+    const pullDownDistance = scrollY.value < 0 ? -scrollY.value : 0;
+    const isRef = isRefreshingSync.value;
+    const translateY = isRef ? 40 : pullDownDistance;
+    const opacity = isRef ? 1 : interpolate(pullDownDistance, [10, 40], [0, 1], Extrapolation.CLAMP);
+    
+    return {
+      opacity,
+      transform: [{ translateY }]
     };
   });
 
@@ -711,6 +728,22 @@ export default function HomeScreen() {
           </View>
         </AnimatedLinearGradient>
 
+        {/* Custom Pull to Refresh Indicator (Especialmente util para iOS con headers absolutos) */}
+        {Platform.OS === 'ios' && (
+          <Animated.View style={[
+            { position: 'absolute', top: CONTENT_PADDING_TOP - 20, left: 0, right: 0, zIndex: -10, alignItems: 'center' },
+            customLoaderAnimatedStyle
+          ]}>
+            <View style={{ backgroundColor: colors.card, padding: 8, borderRadius: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 6, elevation: 4 }}>
+              {refreshing ? (
+                <ActivityIndicator color={colors.primary} size="small" />
+              ) : (
+                <Feather name="arrow-down" size={18} color={colors.textSecondary} />
+              )}
+            </View>
+          </Animated.View>
+        )}
+
         {/* Chips Sticky (Debajo del Header Azul) */}
         <View style={{ backgroundColor: colors.card, paddingBottom: spacing(1.5), paddingTop: spacing(2.5) }}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: spacing(2) }}>
@@ -780,11 +813,18 @@ export default function HomeScreen() {
         contentContainerStyle={{ paddingTop: CONTENT_PADDING_TOP, paddingBottom: spacing(2) }}
         showsVerticalScrollIndicator={false}
         scrollIndicatorInsets={{ top: CONTENT_PADDING_TOP }}
-        progressViewOffset={CONTENT_PADDING_TOP}
         onEndReached={handleLoadMore}
         onEndReachedThreshold={0.5}
-        refreshing={refreshing}
-        onRefresh={onRefresh}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            progressViewOffset={CONTENT_PADDING_TOP}
+            progressBackgroundColor={Platform.OS === 'android' ? colors.card : 'transparent'}
+            tintColor={Platform.OS === 'android' ? colors.primary : 'transparent'}
+            colors={Platform.OS === 'android' ? [colors.primary] : ['transparent']}
+          />
+        }
         ListFooterComponent={loadingMore ? (
           <View style={{ paddingVertical: 20, alignItems: 'center', width: '100%' }}>
             <ActivityIndicator color={colors.primary} />

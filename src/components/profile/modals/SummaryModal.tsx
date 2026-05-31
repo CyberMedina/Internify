@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, Modal, TouchableOpacity, TextInput, ScrollView,
 import { useTheme } from '../../../theme/ThemeContext';
 
 const MIN_LENGTH = 20;
-const MAX_LENGTH = 120;
+const MAX_LENGTH = 500;
 
 interface SummaryModalProps {
   visible: boolean;

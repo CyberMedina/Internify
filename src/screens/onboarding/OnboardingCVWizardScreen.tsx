@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, KeyboardAvoidingView, Platform, Modal, Switch, Alert, BackHandler } from 'react-native';
 import { FontAwesome5, MaterialIcons, Ionicons } from '@expo/vector-icons';
-import Animated, { FadeInRight, FadeOutLeft, Layout, FadeInDown, FadeOut } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeOut, Layout, FadeInDown } from 'react-native-reanimated';
 
 import ScreenContainer from '../../components/ScreenContainer';
 import OnboardingHeader from '../../components/OnboardingHeader';
@@ -165,24 +165,8 @@ export default function OnboardingCVWizardScreen({ navigation, route }: Props) {
         setReferences(refs.slice(0, 3));
       }
 
-      // Determine start step based on missing sections
-      if (missing_sections.summary) {
-        setCurrentStep(1);
-      } else if (missing_sections.secondary_education) {
-        setCurrentStep(2);
-      } else if (missing_sections.experience) {
-        setCurrentStep(3);
-      } else if (missing_sections.certifications) {
-        setCurrentStep(4);
-      } else if (missing_sections.languages) {
-        setCurrentStep(5);
-      } else if (missing_sections.skills) {
-        setCurrentStep(6);
-      } else if (missing_sections.references) {
-        setCurrentStep(7);
-      } else {
-        setCurrentStep(1);
-      }
+      // Siempre iniciar desde el primer paso para que el usuario pueda verificar la información
+      setCurrentStep(1);
     } else if (mode === 'ai') {
       // Fallback mock data if needed
       setSummary('Estudiante proactivo de Ingeniería en Computación con pasión por el desarrollo backend y la inteligencia artificial. Busco oportunidades para aplicar mis conocimientos en C# y React Native en proyectos del mundo real.');
@@ -516,7 +500,7 @@ export default function OnboardingCVWizardScreen({ navigation, route }: Props) {
 
   const renderStep1 = () => {
     const minLength = 20;
-    const maxLength = 120;
+    const maxLength = 500;
     const currentLength = summary.length;
     const isValid = currentLength >= minLength && currentLength <= maxLength;
     const isError = currentLength > 0 && currentLength < minLength;
@@ -1196,8 +1180,8 @@ export default function OnboardingCVWizardScreen({ navigation, route }: Props) {
         >
           <Animated.View 
             key={currentStep} 
-            entering={FadeInRight} 
-            exiting={FadeOutLeft}
+            entering={FadeIn} 
+            exiting={FadeOut}
           >
             {currentStep === 1 && renderStep1()}
             {currentStep === 2 && renderStep2()}
@@ -1216,7 +1200,7 @@ export default function OnboardingCVWizardScreen({ navigation, route }: Props) {
             icon={<FontAwesome5 name="arrow-right" size={16} color="#FFF" />}
             iconPosition="right"
             disabled={
-              (currentStep === 1 && (summary.length < 20 || summary.length > 120)) ||
+              (currentStep === 1 && (summary.length < 20 || summary.length > 500)) ||
               (currentStep === 6 && skills.length < 3)
             }
           />

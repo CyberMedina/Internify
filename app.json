@@ -20,7 +20,7 @@
     "splash": {
       "image": "./src/assets/images/InternifyV4NoLogo.png",
       "resizeMode": "contain",
-      "backgroundColor": "#3B44F6"
+      "backgroundColor": "#3535D0"
     },
     "assetBundlePatterns": [
       "**/*"

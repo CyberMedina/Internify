@@ -621,6 +621,10 @@ export default function JobDetailScreen() {
                   });
 
                   if (!auth.success) {
+                    // Si el usuario simplemente canceló el diálogo o cerró la pantalla (huella/faceID)
+                    if (auth.error === 'user_cancel' || auth.error === 'system_cancel' || auth.error === 'app_cancel') {
+                      return;
+                    }
                     Alert.alert('Error', 'Autenticación fallida');
                     return;
                   }

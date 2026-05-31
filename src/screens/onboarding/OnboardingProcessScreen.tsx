@@ -41,14 +41,14 @@ export default function OnboardingProcessScreen({ navigation }: Props) {
 
   const renderItem = ({ item, index }: { item: typeof onboardingSteps[0]; index: number }) => (
     <View style={styles.slide}>
-      <Animated.View
-        entering={FadeInDown.delay(index * 120).springify()}
-        style={[
-          styles.cardContainer,
-          index === currentIndex ? styles.cardActive : styles.cardInactive,
-        ]}
-      >
-        <LinearGradient
+      <Animated.View entering={FadeInDown.delay(index * 120).springify()}>
+        <Animated.View
+          style={[
+            styles.cardContainer,
+            index === currentIndex ? styles.cardActive : styles.cardInactive,
+          ]}
+        >
+          <LinearGradient
           colors={item.colors}
           style={styles.cardGradient}
           start={{ x: 0, y: 0 }}
@@ -145,6 +145,7 @@ export default function OnboardingProcessScreen({ navigation }: Props) {
             )}
           </View>
         </LinearGradient>
+        </Animated.View>
       </Animated.View>
     </View>
   );

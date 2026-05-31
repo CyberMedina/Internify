@@ -884,7 +884,11 @@ export default function MyProfileScreen() {
                           <View style={{ flex: 1 }}>
                               <Text style={{ fontSize: 16, fontWeight: '700', color: colors.text, marginBottom: 2 }}>{cert.title}</Text>
                               <Text style={{ fontSize: 14, color: colors.primary, marginBottom: 4 }}>{cert.institution}</Text>
-                              <Text style={{ fontSize: 12, color: colors.textSecondary }}>{cert.start_year} - {cert.end_year}</Text>
+                              <Text style={{ fontSize: 12, color: colors.textSecondary }}>
+                                  {cert.start_year && cert.end_year 
+                                      ? `${cert.start_year} - ${cert.end_year}` 
+                                      : cert.start_year || cert.end_year || ''}
+                              </Text>
                           </View>
                           <Feather name="edit-2" size={14} color={colors.textSecondary} style={{ marginTop: 4 }} />
                       </View>

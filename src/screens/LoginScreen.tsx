@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Image, Modal, Platform, ActivityIndicator } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FontAwesome5, Ionicons } from '@expo/vector-icons';
 import { WebView } from 'react-native-webview';
 import * as Device from 'expo-device';
@@ -20,6 +20,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Login'>;
 
 export default function LoginScreen({ navigation }: Props) {
   const { colors, typography, spacing } = useTheme();
+  const insets = useSafeAreaInsets();
   const { login } = useAuth();
   const [showWebView, setShowWebView] = useState(false);
   const [isAuthProcessing, setIsAuthProcessing] = useState(false);
@@ -83,7 +84,14 @@ export default function LoginScreen({ navigation }: Props) {
   };
 
   // Script para inyectar en el WebView y extraer el JSON de la respuesta
-  const INJECTED_JAVASCRIPT = `(function() {
+  const INJECTED_JAVASCRIPT = `
+  // Deshabilitar zoom en input forzando el meta tag en el head
+  var meta = document.createElement('meta');
+  meta.setAttribute('name', 'viewport');
+  meta.setAttribute('content', 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0');
+  document.getElementsByTagName('head')[0].appendChild(meta);
+
+  (function() {
     function waitForJson() {
       var body = document.body.innerText;
       try {
@@ -212,20 +220,21 @@ export default function LoginScreen({ navigation }: Props) {
       <Modal
         visible={showWebView}
         animationType="slide"
+        presentationStyle="pageSheet"
         onRequestClose={() => setShowWebView(false)}
       >
-        <SafeAreaView style={{ flex: 1, backgroundColor: colors.card }}>
-          <View style={styles.modalHeader}>
+        <View style={{ flex: 1, backgroundColor: colors.surface }}>
+          <View style={[styles.modalHeader, { borderBottomColor: colors.border, paddingTop: Platform.OS === 'ios' ? 16 : insets.top + 16 }]}>
             <TouchableOpacity 
               onPress={() => setShowWebView(false)}
               style={styles.closeButton}
             >
-              <Ionicons name="close" size={24} color={colors.text} />
+              <Ionicons name="close" size={26} color={colors.text} />
             </TouchableOpacity>
             <Text style={[styles.modalTitle, { color: colors.text }]}>Iniciar Sesión</Text>
-            <View style={{ width: 24 }} /> 
+            <View style={{ width: 32 }} /> 
           </View>
-          <View style={{ flex: 1 }}>
+          <View style={{ flex: 1, backgroundColor: '#fff' }}>
             <WebView
               source={{ uri: authUrl }}
               onMessage={handleWebViewMessage}
@@ -254,7 +263,7 @@ export default function LoginScreen({ navigation }: Props) {
               </View>
             )}
           </View>
-        </SafeAreaView>
+        </View>
       </Modal>
 
       <View style={styles.content}>
@@ -398,12 +407,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingBottom: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
   },
   closeButton: {
-    padding: 4,
+    padding: 8,
+    marginLeft: -8, // Compensate visual tap area
   },
   modalTitle: {
     fontSize: 18,

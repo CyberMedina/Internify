@@ -75,7 +75,7 @@ export default function SplashScreen() {
 
   return (
     <LinearGradient
-      colors={['#6B6EFF', '#3B44F6', '#3535D0']}
+      colors={['#3535D0', '#3535D0']} // Sincronizado exactamente con el color del app.json
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
       style={{ flex: 1, paddingTop: insets.top, paddingBottom: insets.bottom, alignItems: 'center', justifyContent: 'center' }}
