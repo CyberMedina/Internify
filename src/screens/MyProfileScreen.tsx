@@ -16,6 +16,7 @@ import EducationModal, { Education as ModalEducation } from '../components/profi
 import { SkillsEditModal } from '../components/profile/modals/SkillsEditModal';
 import LanguageModal, { Language as ModalLanguage } from '../components/profile/modals/LanguageModal';
 import SummaryModal from '../components/profile/modals/SummaryModal';
+import GradientButton from '../components/GradientButton';
 
 interface Certification {
   id: number;
@@ -644,6 +645,45 @@ export default function MyProfileScreen() {
 
   const renderContent = () => {
     
+    // Si no tiene CV configurado, mostramos el call to action grande
+    if (studentProfile && !studentProfile.has_cv) {
+      return (
+        <View style={[styles.tabContent, { marginTop: spacing(1) }]}>
+          <View style={{
+            marginHorizontal: spacing(2),
+            marginTop: spacing(2),
+            paddingVertical: spacing(3),
+            paddingHorizontal: spacing(2.5),
+            backgroundColor: colors.surface,
+            borderRadius: 20,
+            borderWidth: 1,
+            borderColor: colors.primary + '30',
+            alignItems: 'center',
+            shadowColor: colors.primary,
+            shadowOffset: { width: 0, height: 6 },
+            shadowOpacity: 0.1,
+            shadowRadius: 12,
+            elevation: 4,
+          }}>
+            <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: colors.primary + '15', alignItems: 'center', justifyContent: 'center', marginBottom: spacing(1.5) }}>
+              <Feather name="star" size={24} color={colors.primary} />
+            </View>
+            <Text style={{ fontSize: 18, fontWeight: '800', color: colors.text, marginBottom: spacing(0.5), textAlign: 'center' }}>
+              Destaca tu talento
+            </Text>
+            <Text style={{ fontSize: 13, color: colors.textSecondary, textAlign: 'center', marginBottom: spacing(2.5), lineHeight: 18 }}>
+              Completa tu perfil profesional para impulsar tu visibilidad ante empresas interesadas.
+            </Text>
+            <GradientButton 
+              title="Crear mi Perfil"
+              onPress={() => (navigation as any).navigate('Onboarding', { screen: 'CVStart' })}
+              style={{ width: '100%' }}
+            />
+          </View>
+        </View>
+      );
+    }
+
     // Función auxiliar para formatear fechas de experiencia
     const formatExpDate = (exp: Experience) => {
         const monthNames = [

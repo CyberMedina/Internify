@@ -67,10 +67,10 @@ const JobCardSmall = memo(({ job, applicantsLabel, bookmarked, onToggleBookmark,
 
       <View style={{ flexDirection: 'row', marginTop: spacing(1), alignItems: 'center', flexWrap: 'wrap' }}>
         {Array.isArray(job.tags) && job.tags.slice(0, 2).map((t) => (
-          <Chip key={t} label={t} style={{ flexShrink: 1 }} />
+          <Chip key={t} label={t} />
         ))}
         {Array.isArray(job.tags) && job.tags.length > 2 ? (
-          <Chip label={`+${job.tags.length - 2}`} variant="subtle" style={{ flexShrink: 0 }} />
+          <Chip label={`+${job.tags.length - 2}`} variant="subtle" />
         ) : null}
       </View>
 

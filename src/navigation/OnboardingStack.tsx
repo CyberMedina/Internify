@@ -19,9 +19,14 @@ export type OnboardingStackParamList = {
   Renewal: undefined;
   Process: undefined;
   Completion: undefined;
-  CVStart: undefined;
+  CVStart: { pendingJobId?: number; pendingJobTitle?: string; pendingJobCompany?: string; pendingJobLogo?: string; pendingJobColor?: string; } | undefined;
   CVWizard: { 
     mode: 'ai' | 'manual';
+    pendingJobId?: number;
+    pendingJobTitle?: string;
+    pendingJobCompany?: string;
+    pendingJobLogo?: string;
+    pendingJobColor?: string;
     cvData?: {
       cv_profile: {
         summary: string | null;
@@ -48,8 +53,8 @@ export type OnboardingStackParamList = {
       };
     };
   };
-  CVPreview: undefined;
-  CVSuccess: undefined;
+  CVPreview: { pendingJobId?: number; pendingJobTitle?: string; pendingJobCompany?: string; pendingJobLogo?: string; pendingJobColor?: string; } | undefined;
+  CVSuccess: { pendingJobId?: number; pendingJobTitle?: string; pendingJobCompany?: string; pendingJobLogo?: string; pendingJobColor?: string; } | undefined;
 };
 
 const Stack = createNativeStackNavigator<OnboardingStackParamList>();

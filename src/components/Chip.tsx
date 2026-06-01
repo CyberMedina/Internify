@@ -1,5 +1,5 @@
 import React, { memo } from 'react';
-import { Text, TouchableOpacity, ViewStyle } from 'react-native';
+import { Text, TouchableOpacity, ViewStyle, Platform } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
 
 type Props = {
@@ -41,15 +41,13 @@ const Chip = memo(({ label, active, onPress, style, variant = 'subtle', size = '
       ]}
     >
       <Text
-        numberOfLines={1}
-        ellipsizeMode="tail"
         style={{
           color: active || variant === 'primary' ? '#fff' : colors.text,
           fontSize,
           fontWeight: '600',
         }}
       >
-        {label}
+        {'\u00A0' + label.replace(/ /g, '\u00A0') + '\u00A0'}
       </Text>
     </TouchableOpacity>
   );

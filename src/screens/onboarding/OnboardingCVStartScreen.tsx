@@ -13,7 +13,7 @@ import { OnboardingStackParamList } from '../../navigation/OnboardingStack';
 
 type Props = NativeStackScreenProps<OnboardingStackParamList, 'CVStart'>;
 
-export default function OnboardingCVStartScreen({ navigation }: Props) {
+export default function OnboardingCVStartScreen({ navigation, route }: Props) {
   const { colors, typography, spacing } = useTheme();
   const [isProcessing, setIsProcessing] = useState(false);
 
@@ -43,7 +43,15 @@ export default function OnboardingCVStartScreen({ navigation }: Props) {
       const data = await api.post<any>('/parse-cv', formData);
       
       setIsProcessing(false);
-      navigation.navigate('CVWizard', { mode: 'ai', cvData: data });
+      navigation.navigate('CVWizard', { 
+        mode: 'ai', 
+        cvData: data,
+        pendingJobId: route.params?.pendingJobId,
+        pendingJobTitle: route.params?.pendingJobTitle,
+        pendingJobCompany: route.params?.pendingJobCompany,
+        pendingJobLogo: route.params?.pendingJobLogo,
+        pendingJobColor: route.params?.pendingJobColor,
+      });
 
     } catch (error) {
       console.error(error);
@@ -53,7 +61,14 @@ export default function OnboardingCVStartScreen({ navigation }: Props) {
   };
 
   const handleManual = () => {
-    navigation.navigate('CVWizard', { mode: 'manual' });
+    navigation.navigate('CVWizard', { 
+      mode: 'manual',
+      pendingJobId: route.params?.pendingJobId,
+      pendingJobTitle: route.params?.pendingJobTitle,
+      pendingJobCompany: route.params?.pendingJobCompany,
+      pendingJobLogo: route.params?.pendingJobLogo,
+      pendingJobColor: route.params?.pendingJobColor,
+    });
   };
 
   if (isProcessing) {

@@ -40,7 +40,7 @@ export const currentUser = {
   lastnames: 'Medina Aguirre',
   email: 'jhonatan.medina@est.uni.edu.ni',
   hours: 1,
-  avatar: null,
+  avatar: 'https://randomuser.me/api/portraits/men/32.jpg',
   isProfileComplete: false,
   profileProgress: 80,
   // Extended mock data for onboarding

@@ -136,10 +136,8 @@ const JobCardLarge = memo(({ job, showBookmark = true, style }: Props) => {
       <View
         style={{
           flexDirection: 'row',
-          flexWrap: Array.isArray(job.tags) && job.tags.length === 3 ? 'nowrap' : 'wrap',
+          flexWrap: 'wrap',
           marginTop: spacing(1),
-          justifyContent: Array.isArray(job.tags) && job.tags.length === 3 ? 'space-between' : 'flex-start',
-          columnGap: Array.isArray(job.tags) && job.tags.length === 3 ? 8 : 0,
           rowGap: spacing(1),
         }}
       >
@@ -147,7 +145,6 @@ const JobCardLarge = memo(({ job, showBookmark = true, style }: Props) => {
           <Chip
             key={t}
             label={t}
-            style={job.tags.length === 3 ? { flexShrink: 1, flexBasis: '32%', marginRight: 0 } : undefined}
           />
         ))}
       </View>

@@ -564,7 +564,7 @@ export default function HomeScreen() {
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: spacing(2) }}>
             <View style={{ flex: 1, paddingRight: spacing(1) }}>
               <Text style={{ fontSize: typography.sizes.lg, fontWeight: '800', color: colors.text, marginBottom: 4 }}>
-                ¡Impulsa tu carrera! 🚀
+                ¡Impulsa tu carrera!
               </Text>
               <Text style={{ color: colors.textSecondary, fontSize: typography.sizes.sm, lineHeight: 20 }}>
                 Sube tu CV para <Text style={{ fontWeight: '700', color: colors.primary }}>activar tu visibilidad</Text> ante las empresas.

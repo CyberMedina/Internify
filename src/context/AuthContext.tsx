@@ -7,6 +7,7 @@ import { useToast } from './ToastContext';
 import { api } from '../services/api';
 import { navigationRef } from '../navigation/navigationRef';
 import { ENV } from '../config/env';
+import { setBannerClosed } from '../utils/storage';
 
 interface AuthContextType {
   userToken: string | null;
@@ -90,6 +91,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await AsyncStorage.removeItem('userToken');
       await AsyncStorage.removeItem('userData');
       await AsyncStorage.removeItem('studentProfile');
+      
+      // Clear home banner cache so it shows again on next login
+      await setBannerClosed(false);
 
       // Force navigation to Login
       if (navigationRef.isReady()) {

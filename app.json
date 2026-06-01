@@ -17,6 +17,7 @@
         "ITSAppUsesNonExemptEncryption": false
       }
     },
+    "backgroundColor": "#3535D0",
     "splash": {
       "image": "./src/assets/images/InternifyV4NoLogo.png",
       "resizeMode": "contain",
@@ -37,6 +38,7 @@
       ]
     ],
     "android": {
+      "backgroundColor": "#3535D0",
       "adaptiveIcon": {
         "foregroundImage": "./src/assets/images/InternifyV4NoLogo.png",
         "backgroundColor": "#3D3DC8"

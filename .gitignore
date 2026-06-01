@@ -22,3 +22,9 @@ Thumbs.db
 internifyu-*.json
 internifyu-02de438d5c31.json
 internifyu-firebase-adminsdk-fbsvc-2ebeefc245.json
+
+# Test 
+amazon-corretto-17-aarch64-macos-jdk.tar.gz
+amazon-corretto-17-x64-macos-jdk.tar.gz
+amazon-corretto-17.jdk
+application-107b016c-85fa-4baa-9ad4-a1fbcd754444.tar.gz

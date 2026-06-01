@@ -634,6 +634,15 @@ export default function JobDetailScreen() {
                 if (userToken && vacancy?.id) {
                   await applyToVacancy(userToken, vacancy.id);
                   await applicationsCtx.refreshApplications(); // Refresh context
+                  setVacancy(prev => prev ? {
+                    ...prev,
+                    application: {
+                      ...prev.application,
+                      has_applied: true,
+                      status: 'pending',
+                      can_apply: false
+                    }
+                  } : null);
                   (navigation as any).navigate('ApplicationSuccess');
                 }
               } catch (error: any) {
@@ -659,12 +668,20 @@ export default function JobDetailScreen() {
         presentationStyle="pageSheet"
       >
         <View style={{ flex: 1, backgroundColor: colors.card, padding: spacing(3), justifyContent: 'center', alignItems: 'center' }}>
-          <View style={{ width: 120, height: 120, backgroundColor: colors.chipBg, borderRadius: 60, alignItems: 'center', justifyContent: 'center', marginBottom: spacing(3) }}>
-            <FontAwesome5 name="user-astronaut" size={50} color={colors.primary} />
-          </View>
+          {data.companyLogo ? (
+            <Image 
+              source={{ uri: data.companyLogo }} 
+              style={{ width: 100, height: 100, borderRadius: 20, marginBottom: spacing(3) }} 
+              resizeMode="contain" 
+            />
+          ) : (
+            <View style={{ width: 100, height: 100, backgroundColor: colors.chipBg, borderRadius: 50, alignItems: 'center', justifyContent: 'center', marginBottom: spacing(3) }}>
+              <Feather name="briefcase" size={40} color={dominantColor} />
+            </View>
+          )}
           
           <Text style={{ fontSize: typography.sizes.xxl, fontWeight: 'bold', color: colors.text, textAlign: 'center', marginBottom: spacing(2) }}>
-            ¡Estás a un paso! 🚀
+            ¡Estás a un paso!
           </Text>
           
           <Text style={{ fontSize: typography.sizes.md, color: colors.textSecondary, textAlign: 'center', marginBottom: spacing(4), lineHeight: 24, paddingHorizontal: spacing(2) }}>
@@ -674,17 +691,27 @@ export default function JobDetailScreen() {
           <GradientButton
             onPress={() => {
               setShowCVModal(false);
-              (navigation as any).navigate('Onboarding', { screen: 'CVStart' });
+              (navigation as any).navigate('Onboarding', { 
+                screen: 'CVStart',
+                params: { 
+                  pendingJobId: vacancy?.id, 
+                  pendingJobTitle: data.title,
+                  pendingJobCompany: data.company,
+                  pendingJobLogo: data.companyLogo,
+                  pendingJobColor: dominantColor,
+                }
+              });
             }}
             title="Completar mi CV ahora"
-            style={{ marginBottom: spacing(2) }}
+            style={{ marginBottom: spacing(2), width: '100%' }}
+            gradientColors={[dominantColor, dominantColor]}
           />
 
           <TouchableOpacity
             style={{ paddingVertical: 16 }}
             onPress={() => setShowCVModal(false)}
           >
-            <Text style={{ color: colors.textSecondary, fontWeight: '600', fontSize: 15 }}>Volver a la oferta</Text>
+            <Text textBreakStrategy="simple" style={{ color: colors.textSecondary, fontWeight: '600', fontSize: 15 }}>Volver a la oferta </Text>
           </TouchableOpacity>
         </View>
       </Modal>

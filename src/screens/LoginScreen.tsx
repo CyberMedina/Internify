@@ -231,7 +231,9 @@ export default function LoginScreen({ navigation }: Props) {
             >
               <Ionicons name="close" size={26} color={colors.text} />
             </TouchableOpacity>
-            <Text style={[styles.modalTitle, { color: colors.text }]}>Iniciar Sesión</Text>
+            <Text style={[styles.modalTitle, { color: colors.text }]} numberOfLines={1}>
+              Iniciar Sesión
+            </Text>
             <View style={{ width: 32 }} /> 
           </View>
           <View style={{ flex: 1, backgroundColor: '#fff' }}>
@@ -418,5 +420,8 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 18,
     fontWeight: '600',
+    flex: 1,
+    textAlign: 'center',
+    marginHorizontal: 16,
   },
 });

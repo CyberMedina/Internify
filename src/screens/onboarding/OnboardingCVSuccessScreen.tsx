@@ -23,7 +23,7 @@ type Props = NativeStackScreenProps<OnboardingStackParamList, 'CVSuccess'>;
 
 const { width } = Dimensions.get('window');
 
-export default function OnboardingCVSuccessScreen({ navigation }: Props) {
+export default function OnboardingCVSuccessScreen({ navigation, route }: Props) {
   const { colors, typography } = useTheme();
 
   // Floating animation for the icon
@@ -138,16 +138,18 @@ export default function OnboardingCVSuccessScreen({ navigation }: Props) {
             entering={FadeInUp.delay(350).duration(600)}
             style={[styles.title, { color: colors.text, fontFamily: typography.bold }]}
           >
-            ¡Tu perfil está{'\n'}listo para brillar! ✨
+            {route.params?.pendingJobCompany 
+              ? `¡Tu CV está listo y\nte postulamos a ${route.params.pendingJobCompany}!`
+              : `¡Tu perfil está\nlisto para brillar! ✨`}
           </Animated.Text>
 
           <Animated.Text
             entering={FadeInUp.delay(500).duration(600)}
             style={[styles.body, { color: colors.textSecondary, fontFamily: typography.regular }]}
           >
-            Las empresas ya pueden encontrarte.{'\n'}
-            Ahora solo queda dar el siguiente paso —{'\n'}
-            encontrar la pasantía que cambie tu historia.
+            {route.params?.pendingJobCompany
+              ? `Tu postulación fue enviada con éxito.\nAhora las empresas también pueden encontrarte.`
+              : `Las empresas ya pueden encontrarte.\nAhora solo queda dar el siguiente paso —\nencontrar la pasantía que cambie tu historia.`}
           </Animated.Text>
 
           {/* Stats row */}

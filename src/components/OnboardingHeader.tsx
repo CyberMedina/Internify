@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome5 } from '@expo/vector-icons';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -12,6 +12,7 @@ interface OnboardingHeaderProps {
   iconLibrary?: any; // Default is FontAwesome5
   iconSize?: number;
   optional?: boolean;
+  imageUri?: string;
 }
 
 export default function OnboardingHeader({ 
@@ -20,7 +21,8 @@ export default function OnboardingHeader({
   subtitle, 
   iconLibrary: IconLib = FontAwesome5,
   iconSize = 40,
-  optional = false
+  optional = false,
+  imageUri
 }: OnboardingHeaderProps) {
   const { colors, typography, spacing } = useTheme();
 
@@ -36,7 +38,15 @@ export default function OnboardingHeader({
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
         >
-          <IconLib name={icon} size={iconSize} color="#FFF" />
+          {imageUri ? (
+            <Image 
+              source={{ uri: imageUri }} 
+              style={{ width: 80, height: 80, borderRadius: 40 }} 
+              resizeMode="cover" 
+            />
+          ) : (
+            <IconLib name={icon} size={iconSize} color="#FFF" />
+          )}
         </LinearGradient>
 
         {optional && (

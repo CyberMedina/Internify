@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Image, NativeSyntheticEvent, NativeScrollEvent } from 'react-native';
+import * as LocalAuthentication from 'expo-local-authentication';
 import { FontAwesome5, Ionicons } from '@expo/vector-icons';
 import ScreenContainer from '../../components/ScreenContainer';
 import OnboardingHeader from '../../components/OnboardingHeader';
@@ -11,14 +12,27 @@ import { OnboardingStackParamList } from '../../navigation/OnboardingStack';
 import { currentUser } from '../../mock/user';
 import { useAuth } from '../../context/AuthContext';
 
+import { applyToVacancy } from '../../services/vacancyService';
+
 type Props = NativeStackScreenProps<OnboardingStackParamList, 'CVPreview'>;
 
-export default function OnboardingCVPreviewScreen({ navigation }: Props) {
+export default function OnboardingCVPreviewScreen({ navigation, route }: Props) {
   const { colors, typography, spacing } = useTheme();
   const { cvProfile } = currentUser;
   const { userToken, studentProfile, fetchStudentProfile } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoadingProfile, setIsLoadingProfile] = useState(false);
+  const [hasScrolledToBottom, setHasScrolledToBottom] = useState(false);
+
+  const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    if (hasScrolledToBottom) return;
+    const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
+    // Un pequeño margen de error para que no sea excesivamente estricto
+    const paddingToBottom = 25;
+    if (layoutMeasurement.height + contentOffset.y >= contentSize.height - paddingToBottom) {
+      setHasScrolledToBottom(true);
+    }
+  };
 
   // Fetch profile if not already loaded in context
   useEffect(() => {
@@ -38,6 +52,35 @@ export default function OnboardingCVPreviewScreen({ navigation }: Props) {
   const displayPhoto = studentProfile?.profile?.photo ?? null;
 
   const handleFinish = async () => {
+    const pendingJobId = route.params?.pendingJobId;
+    const pendingJobCompany = route.params?.pendingJobCompany;
+
+    // Si viene de una vacante, pedimos autenticación antes de procesar nada
+    if (pendingJobId) {
+      try {
+        const hasHardware = await LocalAuthentication.hasHardwareAsync();
+        const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+
+        if (hasHardware && isEnrolled) {
+          const auth = await LocalAuthentication.authenticateAsync({
+            promptMessage: 'Confirma tu identidad para enviar la postulación',
+            fallbackLabel: 'Usar código',
+          });
+
+          if (!auth.success) {
+            if (auth.error === 'user_cancel' || auth.error === 'system_cancel' || auth.error === 'app_cancel') {
+              return; // Usuario canceló explícitamente
+            }
+            Alert.alert('Error', 'Autenticación fallida');
+            return;
+          }
+        }
+      } catch (authError) {
+        console.error('Auth error', authError);
+        // Continuamos si la autenticación falla por falta de hardware o permisos
+      }
+    }
+
     setIsSubmitting(true);
     // Preparar datos para el backend
     const dataToSend = {
@@ -103,7 +146,18 @@ export default function OnboardingCVPreviewScreen({ navigation }: Props) {
       (currentUser as any).isProfileComplete = true;
       (currentUser as any).profileProgress = 100;
 
-      navigation.navigate('CVSuccess');
+      if (pendingJobId && tokenToUse) {
+        console.log(`🚀 POSTULANDO AUTOMÁTICAMENTE A VACANTE ID: ${pendingJobId}`);
+        await applyToVacancy(tokenToUse, pendingJobId);
+      }
+
+      navigation.navigate('CVSuccess', { 
+        pendingJobId, 
+        pendingJobTitle: route.params?.pendingJobTitle,
+        pendingJobCompany,
+        pendingJobLogo: route.params?.pendingJobLogo,
+        pendingJobColor: route.params?.pendingJobColor
+      });
 
     } catch (error: any) {
       console.error('❌ ERROR AL GUARDAR CV:', error);
@@ -163,7 +217,11 @@ export default function OnboardingCVPreviewScreen({ navigation }: Props) {
         subtitle="¡Se ve excelente! Así es como las empresas verán tu perfil."
       />
 
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView 
+        contentContainerStyle={styles.content}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
+      >
         {/* Header Card */}
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           {isLoadingProfile ? (
@@ -279,13 +337,65 @@ export default function OnboardingCVPreviewScreen({ navigation }: Props) {
           </View>
         </View>
 
+        {/* Pending Job Banner */}
+        {route.params?.pendingJobId && (
+          <View style={{
+            marginTop: 16,
+            padding: 16,
+            backgroundColor: colors.surface,
+            borderRadius: 16,
+            borderWidth: 1,
+            borderColor: route.params?.pendingJobColor || colors.primary,
+            shadowColor: route.params?.pendingJobColor || colors.primary,
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.15,
+            shadowRadius: 8,
+            elevation: 4,
+          }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+              <FontAwesome5 name="magic" size={14} color={route.params?.pendingJobColor || colors.primary} />
+              <Text style={{ marginLeft: 8, fontSize: 13, color: route.params?.pendingJobColor || colors.primary, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 }}>
+                Siguiente Paso
+              </Text>
+            </View>
+            
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              {route.params?.pendingJobLogo ? (
+                <Image 
+                  source={{ uri: route.params.pendingJobLogo }} 
+                  style={{ width: 48, height: 48, borderRadius: 12, backgroundColor: colors.card, marginRight: 16 }}
+                  resizeMode="contain"
+                />
+              ) : (
+                <View style={{ width: 48, height: 48, borderRadius: 12, backgroundColor: colors.chipBg, alignItems: 'center', justifyContent: 'center', marginRight: 16 }}>
+                  <FontAwesome5 name="briefcase" size={20} color={route.params?.pendingJobColor || colors.primary} />
+                </View>
+              )}
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: colors.text, fontWeight: '700', fontSize: 16, marginBottom: 4 }} numberOfLines={2}>
+                  Postularte a {route.params?.pendingJobTitle || 'la vacante'}
+                </Text>
+                <Text style={{ color: colors.textSecondary, fontSize: 14 }}>
+                  en {route.params?.pendingJobCompany || 'esta empresa'}
+                </Text>
+              </View>
+            </View>
+          </View>
+        )}
+
       </ScrollView>
 
       <View style={[styles.footer, { backgroundColor: colors.card, borderTopColor: colors.border }]}>
+        {!hasScrolledToBottom && (
+          <Text style={{ textAlign: 'center', fontSize: 13, color: colors.textSecondary, marginBottom: 12, fontStyle: 'italic', fontWeight: '500' }}>
+            Desliza hasta el final para revisar y continuar 👇
+          </Text>
+        )}
         <GradientButton
           onPress={handleFinish}
-          title="Finalizar"
+          title={route.params?.pendingJobId ? "Guardar CV y Postularme" : "Finalizar"}
           loading={isSubmitting}
+          disabled={!hasScrolledToBottom || isSubmitting}
           icon={<FontAwesome5 name="check" size={16} color="#FFF" />}
           iconPosition="right"
         />

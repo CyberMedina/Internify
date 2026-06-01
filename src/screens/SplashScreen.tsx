@@ -9,6 +9,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useAuth } from '../context/AuthContext';
 import { getNotificationConsent, getNotificationConsentGranted } from '../utils/storage';
 import * as Notifications from 'expo-notifications';
+import * as SplashScreenNative from 'expo-splash-screen';
 
 export default function SplashScreen() {
   const { typography } = useTheme();
@@ -23,6 +24,9 @@ export default function SplashScreen() {
   const textTranslate = React.useRef(new Animated.Value(8)).current;
 
   React.useEffect(() => {
+    // Ocultar el splash nativo de Expo ahora que React Native está listo para mostrar el nuestro
+    SplashScreenNative.hideAsync().catch(() => {});
+    
     Animated.sequence([
       Animated.parallel([
         Animated.spring(scale, { toValue: 1, useNativeDriver: true, friction: 6, tension: 80 }),

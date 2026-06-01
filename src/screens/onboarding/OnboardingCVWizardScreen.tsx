@@ -28,7 +28,7 @@ const COMMON_LANGUAGES = [
 
 export default function OnboardingCVWizardScreen({ navigation, route }: Props) {
   const { mode } = route.params;
-  const { userToken } = useAuth();
+  const { userToken, studentProfile } = useAuth();
   const { colors, typography, spacing } = useTheme();
   const [currentStep, setCurrentStep] = useState(1);
   
@@ -313,7 +313,13 @@ export default function OnboardingCVWizardScreen({ navigation, route }: Props) {
       // Save data to mock user
       currentUser.cvProfile = cvData;
 
-      navigation.navigate('CVPreview');
+      navigation.navigate('CVPreview', {
+        pendingJobId: route.params?.pendingJobId,
+        pendingJobTitle: route.params?.pendingJobTitle,
+        pendingJobCompany: route.params?.pendingJobCompany,
+        pendingJobLogo: route.params?.pendingJobLogo,
+        pendingJobColor: route.params?.pendingJobColor,
+      });
     }
   };
 
@@ -511,6 +517,7 @@ export default function OnboardingCVWizardScreen({ navigation, route }: Props) {
         icon="user-tie" 
         title="¿Quién eres como profesional?" 
         subtitle="Escribe un breve resumen. Menciona tu nivel, fortalezas e intereses."
+        imageUri={studentProfile?.profile?.photo || undefined}
       />
       
       <View style={[styles.textAreaContainer, { 
@@ -529,13 +536,15 @@ export default function OnboardingCVWizardScreen({ navigation, route }: Props) {
           onChangeText={setSummary}
           maxLength={maxLength}
         />
-        <View style={{ alignSelf: 'flex-end', marginTop: 4 }}>
-          <Text style={{ 
+        <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 4 }}>
+          <Text 
+            style={{ 
             color: isError ? colors.error : (isValid ? colors.primary : colors.textSecondary), 
             fontSize: 12,
-            fontWeight: isValid ? '600' : '400'
+            fontWeight: isValid ? '600' : '400',
+            includeFontPadding: false // Ayuda con el recorte de fuentes en Android
           }}>
-            {currentLength} / {maxLength}
+            {`${currentLength} / ${maxLength} `}
           </Text>
         </View>
       </View>
